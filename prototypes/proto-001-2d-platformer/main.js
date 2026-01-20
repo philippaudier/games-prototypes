@@ -10,6 +10,7 @@ class GameScene extends Phaser.Scene {
     this.score = data.score || 0;
     this.levelTime = 0; // Chrono du niveau en ms
     this.totalTime = data.totalTime || 0; // Timer total du run
+    this.maxHealth = data.maxHealth || 3; // Vies max persistantes
 
     // Charger les meilleurs temps depuis localStorage
     this.bestTimes = JSON.parse(localStorage.getItem('platformer-best-times') || '{}');
@@ -35,7 +36,6 @@ class GameScene extends Phaser.Scene {
     // Variables joueur
     this.coyoteTimer = 0;
     this.jumpBufferTimer = 0;
-    this.maxHealth = 3;
     this.playerHealth = this.maxHealth; // Full vie au début de chaque niveau
     this.isInvincible = true; // Invincible au spawn
     this.hasKey = false;
@@ -722,7 +722,12 @@ class GameScene extends Phaser.Scene {
     }
 
     // Niveau suivant (totalTime inclut le temps du niveau actuel)
-    this.scene.restart({ level: this.currentLevel + 1, score: this.score, totalTime: this.totalTime + this.levelTime });
+    this.scene.restart({
+      level: this.currentLevel + 1,
+      score: this.score,
+      totalTime: this.totalTime + this.levelTime,
+      maxHealth: this.maxHealth
+    });
   }
 
   formatTime(ms) {
@@ -761,7 +766,7 @@ class GameScene extends Phaser.Scene {
     this.healthText.setText('❤️'.repeat(Math.max(0, this.playerHealth)) + '🖤'.repeat(Math.max(0, this.maxHealth - this.playerHealth)));
 
     if (this.playerHealth <= 0) {
-      this.scene.restart({ level: 1, score: 0 });
+      this.scene.restart({ level: 1, score: 0, totalTime: 0, maxHealth: 3 });
       return;
     }
 
@@ -820,7 +825,7 @@ class GameScene extends Phaser.Scene {
   update(time, delta) {
     // Reset rapide (R)
     if (Phaser.Input.Keyboard.JustDown(this.keys.r)) {
-      this.scene.restart({ level: 1, score: 0, totalTime: 0 });
+      this.scene.restart({ level: 1, score: 0, totalTime: 0, maxHealth: 3 });
       return;
     }
 
