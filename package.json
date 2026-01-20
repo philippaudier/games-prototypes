@@ -1,0 +1,17 @@
+{
+  "name": "games-prototypes",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "new": "node scripts/new-proto.js",
+    "list": "node scripts/list.js"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "phaser": "^3.80.0",
+    "three": "^0.168.0"
+  }
+}
