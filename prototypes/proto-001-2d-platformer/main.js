@@ -359,6 +359,7 @@ class GameScene extends Phaser.Scene {
 
         // Activer le joueur
         this.canMove = true;
+        this.startLevelMusic(); // Démarrer la musique du niveau
         this.time.delayedCall(500, () => {
           this.isInvincible = false;
         });
@@ -462,9 +463,18 @@ class GameScene extends Phaser.Scene {
           this.startBossMusic(this.pendingBossMusic);
           this.pendingBossMusic = null;
         }
+        // Si une musique de niveau était en attente
+        if (this.pendingMusic) {
+          this.playMusicTrack(this.pendingMusic);
+          this.pendingMusic = null;
+        }
       }
       if (this.audioCtx.state === 'suspended') {
         this.audioCtx.resume();
+      }
+      // Essayer de jouer la musique en attente (HTML5 Audio)
+      if (this.currentTrack && this.currentTrack.paused && this.musicPlaying) {
+        this.currentTrack.play().catch(() => {});
       }
     };
 
@@ -808,16 +818,154 @@ class GameScene extends Phaser.Scene {
     this.musicNodes = [];
     this.musicIntervals = [];
     this.musicPlaying = false;
-    this.currentMusicType = null;
     this.musicMasterGain = null;
+    this.musicVolume = 0.4;
+
+    // Utiliser un stockage global pour persister la musique entre les niveaux
+    if (!window.gameMusic) {
+      window.gameMusic = {
+        tracks: {},
+        currentTrack: null,
+        currentType: null,
+        isPlaying: false
+      };
+
+      const musicFiles = {
+        'level': 'music/bgm.mp3',
+        'boss1': 'music/bgm_charger.mp3',
+        'boss2': 'music/bgm_spinner.mp3',
+        'boss3': 'music/bgm_splitter.mp3',
+        'boss4': 'music/bgm_guardian.mp3',
+        'boss5': 'music/bgm_summoner.mp3'
+      };
+
+      // Charger toutes les pistes une seule fois
+      Object.entries(musicFiles).forEach(([key, path]) => {
+        const audio = new Audio(path);
+        audio.loop = true;
+        audio.volume = this.musicVolume;
+        audio.preload = 'auto';
+        window.gameMusic.tracks[key] = audio;
+      });
+    }
+
+    // Référencer le stockage global
+    this.musicTracks = window.gameMusic.tracks;
+    this.currentTrack = window.gameMusic.currentTrack;
+    this.currentMusicType = window.gameMusic.currentType;
+
+    // Mettre à jour le volume si les pistes existent déjà
+    Object.values(this.musicTracks).forEach(track => {
+      track.volume = this.musicVolume;
+    });
+  }
+
+  startLevelMusic() {
+    // Vérifier si c'est un niveau boss
+    const isBossLevel = this.currentLevel % 5 === 0;
+    if (isBossLevel) return; // La musique de boss est gérée séparément
+
+    this.playMusicTrack('level');
+  }
+
+  playMusicTrack(trackKey) {
+    // Vérifier via l'état GLOBAL si la même piste joue déjà
+    const globalMusic = window.gameMusic;
+
+    // Si la même piste est marquée comme "en cours", ne pas la redémarrer
+    if (globalMusic.currentType === trackKey && globalMusic.isPlaying) {
+      // La musique joue déjà, synchroniser les refs locales et sortir
+      this.currentTrack = globalMusic.currentTrack;
+      this.currentMusicType = globalMusic.currentType;
+      this.musicPlaying = true;
+      return;
+    }
+
+    // Arrêter la piste actuelle avec fade out (seulement si c'est une piste différente)
+    if (globalMusic.currentTrack && globalMusic.currentType !== trackKey && globalMusic.isPlaying) {
+      this.fadeOutTrack(globalMusic.currentTrack, 500);
+      globalMusic.isPlaying = false;
+    }
+
+    // Jouer la nouvelle piste
+    const track = this.musicTracks[trackKey];
+    if (track) {
+      track.currentTime = 0;
+      track.volume = 0;
+
+      this.currentTrack = track;
+      this.currentMusicType = trackKey;
+      this.musicPlaying = true;
+
+      // Sauvegarder l'état global
+      globalMusic.currentTrack = track;
+      globalMusic.currentType = trackKey;
+      globalMusic.isPlaying = true;
+
+      // Jouer avec fade in
+      track.play().catch(e => {
+        // Autoplay bloqué - sera lancé au premier input utilisateur
+        this.pendingMusic = trackKey;
+      });
+      this.fadeInTrack(track, 500);
+    }
+  }
+
+  fadeInTrack(track, duration) {
+    const targetVolume = this.musicVolume;
+    const steps = 20;
+    const stepTime = duration / steps;
+    const volumeStep = targetVolume / steps;
+    let currentStep = 0;
+
+    const fadeInterval = setInterval(() => {
+      currentStep++;
+      track.volume = Math.min(targetVolume, volumeStep * currentStep);
+      if (currentStep >= steps) {
+        clearInterval(fadeInterval);
+      }
+    }, stepTime);
+  }
+
+  fadeOutTrack(track, duration) {
+    const startVolume = track.volume;
+    const steps = 20;
+    const stepTime = duration / steps;
+    const volumeStep = startVolume / steps;
+    let currentStep = 0;
+
+    const fadeInterval = setInterval(() => {
+      currentStep++;
+      track.volume = Math.max(0, startVolume - volumeStep * currentStep);
+      if (currentStep >= steps) {
+        clearInterval(fadeInterval);
+        track.pause();
+        track.currentTime = 0;
+      }
+    }, stepTime);
   }
 
   stopMusic() {
     this.musicPlaying = false;
-    this.currentMusicType = null;
-    this.pendingBossMusic = null; // Annuler toute musique en attente
+    this.pendingBossMusic = null;
+    this.pendingMusic = null;
 
-    // Arrêter tous les intervals en premier
+    // Arrêter la piste audio externe avec fade out
+    if (this.currentTrack) {
+      this.fadeOutTrack(this.currentTrack, 300);
+      this.currentTrack = null;
+    }
+
+    this.currentMusicType = null;
+
+    // Mettre à jour l'état global
+    if (window.gameMusic) {
+      window.gameMusic.currentTrack = null;
+      window.gameMusic.currentType = null;
+      window.gameMusic.isPlaying = false;
+    }
+
+    // Arrêter tous les intervals (fallback synthétique)
     if (this.musicIntervals && this.musicIntervals.length > 0) {
       this.musicIntervals.forEach(interval => {
         try { clearInterval(interval); } catch (e) {}
@@ -825,7 +973,7 @@ class GameScene extends Phaser.Scene {
       this.musicIntervals = [];
     }
 
-    // Déconnecter et arrêter tous les nodes audio
+    // Déconnecter et arrêter tous les nodes audio (fallback synthétique)
     if (this.musicNodes && this.musicNodes.length > 0) {
       this.musicNodes.forEach(node => {
         try {
@@ -847,32 +995,9 @@ class GameScene extends Phaser.Scene {
 
 
   startBossMusic(bossType) {
-    // Si audio pas encore activé, sauvegarder pour plus tard
-    if (!this.audioCtx || !this.audioEnabled) {
-      this.pendingBossMusic = bossType;
-      return;
-    }
-
-    // Arrêter toute musique existante
-    this.stopMusic();
-
-    this.currentMusicType = `boss${bossType}`;
-    this.musicPlaying = true;
-
-    const ctx = this.audioCtx;
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.18, ctx.currentTime);
-    masterGain.connect(ctx.destination);
-    this.musicMasterGain = masterGain;
-    this.musicNodes.push(masterGain);
-
-    switch (bossType) {
-      case 1: this.createChargerMusic(ctx, masterGain); break;
-      case 2: this.createSpinnerMusic(ctx, masterGain); break;
-      case 3: this.createSplitterMusic(ctx, masterGain); break;
-      case 4: this.createGuardianMusic(ctx, masterGain); break;
-      case 5: this.createSummonerMusic(ctx, masterGain); break;
-    }
+    // Utiliser les fichiers audio externes
+    const trackKey = `boss${bossType}`;
+    this.playMusicTrack(trackKey);
   }
 
   // CHARGER: Agressif, tempo rapide, beats durs
@@ -2076,7 +2201,8 @@ class GameScene extends Phaser.Scene {
     if (!isBossLevel) {
       this.key = this.createKeySprite(keyX, keyY - 30);
       this.physics.add.existing(this.key, true);
-      this.key.body.setSize(20, 30);
+      this.key.body.setSize(24, 36);
+      this.key.body.setOffset(-12, -18); // Centrer la hitbox sur le visuel de la clé
       this.physics.add.overlap(this.player, this.key, this.collectKey, null, this);
     }
 
@@ -2197,9 +2323,14 @@ class GameScene extends Phaser.Scene {
     // Vie bonus (chance aléatoire - reroll à chaque partie)
     const heartChance = Math.min(0.15 + this.currentLevel * 0.03, 0.4); // 15% -> 40% max
     if (Math.random() < heartChance) {  // Math.random() pour un vrai reroll
-      // Placer sur une plateforme aléatoire
-      const heartPlat = platformData.length > 0
-        ? platformData[this.rng.between(0, platformData.length - 1)]
+      // Placer sur une plateforme aléatoire (exclure la zone de la porte et de la clé)
+      const validHeartPlatforms = platformData.filter(p => {
+        const distToDoor = Math.abs(p.x - doorX) + Math.abs(p.y - doorY);
+        const distToKey = Math.abs(p.x - keyX) + Math.abs(p.y - keyY);
+        return distToDoor > 60 && distToKey > 60; // Exclure les plateformes proches de la porte/clé
+      });
+      const heartPlat = validHeartPlatforms.length > 0
+        ? validHeartPlatforms[this.rng.between(0, validHeartPlatforms.length - 1)]
         : null;
 
       if (heartPlat) {

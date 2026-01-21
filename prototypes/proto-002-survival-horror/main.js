@@ -55,6 +55,9 @@ class GameScene extends Phaser.Scene {
       height: 400
     };
 
+    // Initialize audio system
+    this.initAudio();
+
     // Config
     this.config = {
       playerSpeed: 120,
@@ -88,6 +91,404 @@ class GameScene extends Phaser.Scene {
 
     // Ambient sound (simulated with text for now)
     this.ambientTimer = 0;
+  }
+
+  // ==========================================
+  // AUDIO SYSTEM
+  // ==========================================
+
+  initAudio() {
+    // Create Web Audio context
+    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    this.masterGain = this.audioCtx.createGain();
+    this.masterGain.gain.value = 0.3;
+    this.masterGain.connect(this.audioCtx.destination);
+
+    // Footstep timer
+    this.footstepTimer = 0;
+    this.lastFootstep = 0;
+
+    // Ambient sound timer
+    this.ambientSoundTimer = 0;
+
+    // Zombie groan timers
+    this.zombieGroanTimers = new Map();
+  }
+
+  playSound(type, options = {}) {
+    if (!this.audioCtx) return;
+
+    // Resume audio context if suspended (browser autoplay policy)
+    if (this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume();
+    }
+
+    const ctx = this.audioCtx;
+    const now = ctx.currentTime;
+
+    switch (type) {
+      case 'gunshot': {
+        // Punchy gunshot with low thump and high crack
+        const noise = ctx.createBufferSource();
+        const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.15, ctx.sampleRate);
+        const noiseData = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < noiseData.length; i++) {
+          noiseData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.02));
+        }
+        noise.buffer = noiseBuffer;
+
+        // Low frequency thump
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.exponentialRampToValueAtTime(30, now + 0.1);
+
+        const oscGain = ctx.createGain();
+        oscGain.gain.setValueAtTime(0.8, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+
+        // Noise filter for crack
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 1000;
+
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.6, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+
+        // Distortion for grit
+        const distortion = ctx.createWaveShaper();
+        distortion.curve = this.makeDistortionCurve(100);
+
+        osc.connect(oscGain).connect(distortion).connect(this.masterGain);
+        noise.connect(filter).connect(noiseGain).connect(distortion);
+
+        osc.start(now);
+        noise.start(now);
+        osc.stop(now + 0.15);
+        noise.stop(now + 0.15);
+        break;
+      }
+
+      case 'empty': {
+        // Click sound for empty gun
+        const osc = ctx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(1200, now);
+        osc.frequency.setValueAtTime(800, now + 0.02);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+
+        osc.connect(gain).connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.05);
+        break;
+      }
+
+      case 'footstep': {
+        // Soft footstep
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(80 + Math.random() * 40, now);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 200;
+
+        osc.connect(filter).connect(gain).connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.1);
+        break;
+      }
+
+      case 'footstep_run': {
+        // Louder running footstep
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(100 + Math.random() * 50, now);
+
+        const noise = ctx.createBufferSource();
+        const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.05, ctx.sampleRate);
+        const noiseData = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < noiseData.length; i++) {
+          noiseData[i] = (Math.random() * 2 - 1) * 0.3;
+        }
+        noise.buffer = noiseBuffer;
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 300;
+
+        osc.connect(filter).connect(gain).connect(this.masterGain);
+        noise.connect(gain);
+
+        osc.start(now);
+        noise.start(now);
+        osc.stop(now + 0.12);
+        noise.stop(now + 0.12);
+        break;
+      }
+
+      case 'zombie_groan': {
+        // Creepy zombie groan
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        osc1.type = 'sawtooth';
+        osc2.type = 'sine';
+
+        const baseFreq = 80 + Math.random() * 40;
+        osc1.frequency.setValueAtTime(baseFreq, now);
+        osc1.frequency.linearRampToValueAtTime(baseFreq * 0.7, now + 0.5);
+        osc2.frequency.setValueAtTime(baseFreq * 1.5, now);
+        osc2.frequency.linearRampToValueAtTime(baseFreq, now + 0.5);
+
+        // Tremolo for creepy effect
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = 5 + Math.random() * 3;
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 0.3;
+        lfo.connect(lfoGain);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.15, now + 0.1);
+        gain.gain.linearRampToValueAtTime(0.1, now + 0.4);
+        gain.gain.linearRampToValueAtTime(0, now + 0.6);
+
+        lfoGain.connect(gain.gain);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 400;
+        filter.Q.value = 2;
+
+        osc1.connect(filter).connect(gain).connect(this.masterGain);
+        osc2.connect(filter);
+
+        lfo.start(now);
+        osc1.start(now);
+        osc2.start(now);
+        lfo.stop(now + 0.6);
+        osc1.stop(now + 0.6);
+        osc2.stop(now + 0.6);
+        break;
+      }
+
+      case 'zombie_alert': {
+        // Alert growl - higher pitched
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.linearRampToValueAtTime(200, now + 0.15);
+        osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.linearRampToValueAtTime(0.15, now + 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 600;
+
+        osc.connect(filter).connect(gain).connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.4);
+        break;
+      }
+
+      case 'pickup': {
+        // Item pickup jingle
+        const notes = [523, 659, 784]; // C5, E5, G5
+        notes.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0, now + i * 0.08);
+          gain.gain.linearRampToValueAtTime(0.2, now + i * 0.08 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.08 + 0.2);
+
+          osc.connect(gain).connect(this.masterGain);
+          osc.start(now + i * 0.08);
+          osc.stop(now + i * 0.08 + 0.25);
+        });
+        break;
+      }
+
+      case 'door': {
+        // Heavy door creak
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(60, now);
+        osc.frequency.linearRampToValueAtTime(40, now + 0.3);
+
+        // Noise for friction
+        const noise = ctx.createBufferSource();
+        const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.4, ctx.sampleRate);
+        const noiseData = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < noiseData.length; i++) {
+          noiseData[i] = (Math.random() * 2 - 1) * 0.5;
+        }
+        noise.buffer = noiseBuffer;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(200, now);
+        filter.frequency.linearRampToValueAtTime(150, now + 0.3);
+        filter.Q.value = 5;
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.linearRampToValueAtTime(0.1, now + 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+        osc.connect(gain).connect(this.masterGain);
+        noise.connect(filter).connect(gain);
+
+        osc.start(now);
+        noise.start(now);
+        osc.stop(now + 0.4);
+        noise.stop(now + 0.4);
+        break;
+      }
+
+      case 'hurt': {
+        // Pain grunt
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(100, now + 0.2);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 800;
+
+        osc.connect(filter).connect(gain).connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.25);
+        break;
+      }
+
+      case 'hit': {
+        // Zombie hit splat
+        const noise = ctx.createBufferSource();
+        const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.1, ctx.sampleRate);
+        const noiseData = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < noiseData.length; i++) {
+          noiseData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.03));
+        }
+        noise.buffer = noiseBuffer;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 500;
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+
+        noise.connect(filter).connect(gain).connect(this.masterGain);
+        noise.start(now);
+        noise.stop(now + 0.1);
+        break;
+      }
+
+      case 'death': {
+        // Zombie death cry
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.8);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.linearRampToValueAtTime(0.2, now + 0.3);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(800, now);
+        filter.frequency.exponentialRampToValueAtTime(200, now + 0.8);
+
+        osc.connect(filter).connect(gain).connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.8);
+        break;
+      }
+
+      case 'ambient': {
+        // Creepy ambient drone
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        osc1.type = 'sine';
+        osc2.type = 'sine';
+
+        const baseFreq = 40 + Math.random() * 20;
+        osc1.frequency.value = baseFreq;
+        osc2.frequency.value = baseFreq * 1.01; // Slight detune for beating
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.08, now + 1);
+        gain.gain.linearRampToValueAtTime(0.05, now + 2.5);
+        gain.gain.linearRampToValueAtTime(0, now + 4);
+
+        osc1.connect(gain).connect(this.masterGain);
+        osc2.connect(gain);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 4);
+        osc2.stop(now + 4);
+        break;
+      }
+
+      case 'heartbeat': {
+        // Tense heartbeat
+        for (let i = 0; i < 2; i++) {
+          const osc = ctx.createOscillator();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(50, now + i * 0.15);
+          osc.frequency.exponentialRampToValueAtTime(30, now + i * 0.15 + 0.1);
+
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0, now + i * 0.15);
+          gain.gain.linearRampToValueAtTime(0.3, now + i * 0.15 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.15 + 0.15);
+
+          osc.connect(gain).connect(this.masterGain);
+          osc.start(now + i * 0.15);
+          osc.stop(now + i * 0.15 + 0.2);
+        }
+        break;
+      }
+    }
+  }
+
+  makeDistortionCurve(amount) {
+    const samples = 44100;
+    const curve = new Float32Array(samples);
+    for (let i = 0; i < samples; i++) {
+      const x = (i * 2) / samples - 1;
+      curve[i] = ((3 + amount) * x * 20 * (Math.PI / 180)) / (Math.PI + amount * Math.abs(x));
+    }
+    return curve;
   }
 
   // ==========================================
@@ -627,11 +1028,79 @@ class GameScene extends Phaser.Scene {
 
     zombie.zombieId = id;
     zombie.health = 100;
-    zombie.state = 'idle'; // idle, chase, attack
-    zombie.lastSeen = 0;
+    zombie.state = 'idle'; // idle, alert, investigate, chase
+    zombie.alertLevel = 0; // 0-100, increases when detecting player
+    zombie.lastKnownPlayerX = null;
+    zombie.lastKnownPlayerY = null;
+    zombie.investigateTimer = 0;
+    zombie.wanderAngle = Math.random() * Math.PI * 2;
+    zombie.wanderTimer = 0;
+    zombie.fov = Phaser.Math.DegToRad(120); // Field of view angle
 
     this.zombies.add(zombie);
     return zombie;
+  }
+
+  // Alert nearby zombies (sound propagation)
+  alertNearbyZombies(x, y, radius, alertAmount) {
+    this.zombies.getChildren().forEach(zombie => {
+      const dist = Phaser.Math.Distance.Between(x, y, zombie.x, zombie.y);
+      if (dist < radius) {
+        const falloff = 1 - (dist / radius);
+        zombie.alertLevel = Math.min(100, zombie.alertLevel + alertAmount * falloff);
+        zombie.lastKnownPlayerX = x;
+        zombie.lastKnownPlayerY = y;
+        if (zombie.alertLevel > 50 && zombie.state === 'idle') {
+          zombie.state = 'alert';
+        }
+      }
+    });
+  }
+
+  // Check if zombie can see the player
+  canZombieSeePlayer(zombie) {
+    const dist = Phaser.Math.Distance.Between(zombie.x, zombie.y, this.player.x, this.player.y);
+
+    // Too far to see
+    if (dist > 250) return false;
+
+    // Check if player is in zombie's field of view
+    const angleToPlayer = Phaser.Math.Angle.Between(zombie.x, zombie.y, this.player.x, this.player.y);
+    const zombieFacing = zombie.rotation - Math.PI / 2;
+    const angleDiff = Math.abs(Phaser.Math.Angle.Wrap(angleToPlayer - zombieFacing));
+
+    if (angleDiff > zombie.fov / 2) return false;
+
+    // Check line of sight (simple raycast against walls)
+    const hasLineOfSight = this.checkLineOfSight(zombie.x, zombie.y, this.player.x, this.player.y);
+
+    return hasLineOfSight;
+  }
+
+  // Simple line of sight check
+  checkLineOfSight(x1, y1, x2, y2) {
+    const steps = 10;
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps;
+      const checkX = x1 + (x2 - x1) * t;
+      const checkY = y1 + (y2 - y1) * t;
+
+      // Check against walls
+      let blocked = false;
+      this.walls.getChildren().forEach(wall => {
+        if (wall.getBounds().contains(checkX, checkY)) {
+          blocked = true;
+        }
+      });
+      this.furniture.getChildren().forEach(furn => {
+        if (furn.getBounds().contains(checkX, checkY)) {
+          blocked = true;
+        }
+      });
+
+      if (blocked) return false;
+    }
+    return true;
   }
 
   // ==========================================
@@ -1111,7 +1580,7 @@ class GameScene extends Phaser.Scene {
 
     // Inventory panel
     const panelW = 400;
-    const panelH = 280;
+    const panelH = 320;
     this.invPanel = this.add.rectangle(0, 0, panelW, panelH, 0x1a1512);
     this.invPanel.setStrokeStyle(3, 0x8b4513);
     this.invContainer.add(this.invPanel);
@@ -1130,7 +1599,7 @@ class GameScene extends Phaser.Scene {
     this.invSlotGraphics = [];
     const slotSize = 60;
     const startX = -1.5 * (slotSize + 10);
-    const startY = -30;
+    const startY = -55;
 
     for (let i = 0; i < this.inventorySize; i++) {
       const row = Math.floor(i / 4);
@@ -1476,6 +1945,7 @@ class GameScene extends Phaser.Scene {
     const data = item.itemData;
     this.inventory.push(data.id);
     this.showMessage(`Picked up: ${data.name}`);
+    this.playSound('pickup');
     item.destroy();
     this.updateUI();
   }
@@ -1486,12 +1956,14 @@ class GameScene extends Phaser.Scene {
     if (d.locked) {
       if (this.inventory.includes(d.locked)) {
         this.showMessage(`Used ${d.locked} to unlock the door`);
+        this.playSound('pickup');
         d.locked = null;
         door.setFillStyle(0x654321);
       } else {
         this.showMessage("It's locked. I need a key.");
       }
     } else {
+      this.playSound('door');
       this.transitionToRoom(d.toRoom, d.spawnX, d.spawnY, d.spawnAngle);
     }
   }
@@ -1511,6 +1983,9 @@ class GameScene extends Phaser.Scene {
     this.playerHealth -= 10;
     this.isInvincible = true;
     this.updateUI();
+
+    // Sound
+    this.playSound('hurt');
 
     // Flash red
     this.cameras.main.flash(200, 100, 0, 0);
@@ -1539,11 +2014,16 @@ class GameScene extends Phaser.Scene {
   shoot() {
     if (this.playerAmmo <= 0) {
       this.showMessage("No ammo!");
+      this.playSound('empty');
       return;
     }
 
     this.playerAmmo--;
     this.updateUI();
+
+    // Gunshot alerts all zombies in a large radius
+    this.alertNearbyZombies(this.player.x, this.player.y, 400, 70);
+    this.playSound('gunshot');
 
     // Muzzle flash
     const angle = this.player.rotation - Math.PI / 2;
@@ -1570,6 +2050,7 @@ class GameScene extends Phaser.Scene {
 
       if (dist < range && angleDiff < spreadAngle) {
         zombie.health -= 50;
+        this.playSound('hit');
 
         // Blood effect
         const blood = this.add.circle(zombie.x, zombie.y, 15, 0x880000);
@@ -1583,6 +2064,7 @@ class GameScene extends Phaser.Scene {
 
         if (zombie.health <= 0) {
           this.zombiesKilled.push(zombie.zombieId);
+          this.playSound('death');
           zombie.destroy();
           this.showMessage("Zombie killed!");
         }
@@ -1722,6 +2204,22 @@ class GameScene extends Phaser.Scene {
 
     this.player.body.setVelocity(vx, vy);
 
+    // Footstep sounds
+    if (forward || backward) {
+      this.footstepTimer += delta;
+      const footstepInterval = running ? 200 : 350;
+      if (this.footstepTimer >= footstepInterval) {
+        this.footstepTimer = 0;
+        this.playSound(running ? 'footstep_run' : 'footstep');
+        // Running alerts nearby zombies
+        if (running) {
+          this.alertNearbyZombies(this.player.x, this.player.y, 200, 25);
+        }
+      }
+    } else {
+      this.footstepTimer = 0;
+    }
+
     // Shooting
     if (shootPressed) {
       this.shoot();
@@ -1744,48 +2242,186 @@ class GameScene extends Phaser.Scene {
     // Update lighting
     this.updateLighting();
 
+    // Ambient sounds
+    this.ambientSoundTimer += delta;
+    if (this.ambientSoundTimer > 8000 + Math.random() * 7000) {
+      this.ambientSoundTimer = 0;
+      this.playSound('ambient');
+    }
+
+    // Heartbeat when low health
+    if (this.playerHealth <= 30) {
+      if (!this.heartbeatTimer) this.heartbeatTimer = 0;
+      this.heartbeatTimer += delta;
+      if (this.heartbeatTimer > 1200) {
+        this.heartbeatTimer = 0;
+        this.playSound('heartbeat');
+      }
+    }
+
+    // Zombie groans
+    this.zombies.getChildren().forEach(zombie => {
+      if (!this.zombieGroanTimers.has(zombie.zombieId)) {
+        this.zombieGroanTimers.set(zombie.zombieId, Math.random() * 5000);
+      }
+      let timer = this.zombieGroanTimers.get(zombie.zombieId);
+      timer += delta;
+
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, zombie.x, zombie.y);
+      if (dist < 300 && timer > 4000 + Math.random() * 4000) {
+        this.zombieGroanTimers.set(zombie.zombieId, 0);
+        if (zombie.state === 'chase') {
+          this.playSound('zombie_alert');
+        } else {
+          this.playSound('zombie_groan');
+        }
+      } else {
+        this.zombieGroanTimers.set(zombie.zombieId, timer);
+      }
+    });
+
     // Reset touch states
     this.resetTouchJustPressed();
   }
 
   updateZombies(delta) {
+    const deltaSeconds = delta / 1000;
+
     this.zombies.getChildren().forEach(zombie => {
-      const dist = Phaser.Math.Distance.Between(
+      const distToPlayer = Phaser.Math.Distance.Between(
         this.player.x, this.player.y,
         zombie.x, zombie.y
       );
-
-      // Check if player is in flashlight cone (zombie can "see" player)
       const angleToPlayer = Phaser.Math.Angle.Between(zombie.x, zombie.y, this.player.x, this.player.y);
 
-      if (dist < 200) {
-        // Chase player
-        zombie.state = 'chase';
-        const speed = this.config.zombieChaseSpeed;
-        zombie.body.setVelocity(
-          Math.cos(angleToPlayer) * speed,
-          Math.sin(angleToPlayer) * speed
-        );
+      // === DETECTION PHASE ===
 
-        // Face player
-        zombie.rotation = angleToPlayer + Math.PI / 2;
-      } else if (zombie.state === 'chase' && dist < 300) {
-        // Continue chasing if was already chasing
-        const speed = this.config.zombieSpeed;
-        zombie.body.setVelocity(
-          Math.cos(angleToPlayer) * speed,
-          Math.sin(angleToPlayer) * speed
-        );
-      } else {
-        // Idle - slow random movement
-        zombie.state = 'idle';
-        if (Math.random() < 0.01) {
-          const randAngle = Math.random() * Math.PI * 2;
-          zombie.body.setVelocity(
-            Math.cos(randAngle) * 20,
-            Math.sin(randAngle) * 20
-          );
+      // Visual detection
+      const canSee = this.canZombieSeePlayer(zombie);
+
+      // Flashlight detection - zombies are attracted to light
+      let flashlightDetection = false;
+      if (this.flashlightOn && distToPlayer < 300) {
+        const playerAngle = this.player.rotation - Math.PI / 2;
+        const angleFromPlayer = Phaser.Math.Angle.Between(this.player.x, this.player.y, zombie.x, zombie.y);
+        const angleDiff = Math.abs(Phaser.Math.Angle.Wrap(angleFromPlayer - playerAngle));
+        if (angleDiff < Phaser.Math.DegToRad(this.config.flashlightAngle)) {
+          flashlightDetection = true;
+          zombie.alertLevel = Math.min(100, zombie.alertLevel + 30 * deltaSeconds);
         }
+      }
+
+      // Close proximity detection (can hear breathing/footsteps)
+      if (distToPlayer < 80) {
+        zombie.alertLevel = Math.min(100, zombie.alertLevel + 50 * deltaSeconds);
+      }
+
+      // Update alert based on vision
+      if (canSee) {
+        zombie.alertLevel = Math.min(100, zombie.alertLevel + 60 * deltaSeconds);
+        zombie.lastKnownPlayerX = this.player.x;
+        zombie.lastKnownPlayerY = this.player.y;
+      } else {
+        // Alert decays over time
+        zombie.alertLevel = Math.max(0, zombie.alertLevel - 5 * deltaSeconds);
+      }
+
+      // === STATE MACHINE ===
+
+      // Determine state based on alert level
+      if (zombie.alertLevel >= 80 || (canSee && distToPlayer < 150)) {
+        zombie.state = 'chase';
+      } else if (zombie.alertLevel >= 40) {
+        zombie.state = 'investigate';
+      } else if (zombie.alertLevel >= 20) {
+        zombie.state = 'alert';
+      } else {
+        zombie.state = 'idle';
+      }
+
+      // === BEHAVIOR BASED ON STATE ===
+
+      switch (zombie.state) {
+        case 'chase':
+          // Aggressive pursuit
+          const chaseSpeed = this.config.zombieChaseSpeed;
+          zombie.body.setVelocity(
+            Math.cos(angleToPlayer) * chaseSpeed,
+            Math.sin(angleToPlayer) * chaseSpeed
+          );
+          // Face player directly
+          zombie.rotation = angleToPlayer + Math.PI / 2;
+          // Update last known position
+          zombie.lastKnownPlayerX = this.player.x;
+          zombie.lastKnownPlayerY = this.player.y;
+          // Alert nearby zombies
+          if (Math.random() < 0.02) {
+            this.alertNearbyZombies(zombie.x, zombie.y, 150, 20);
+          }
+          break;
+
+        case 'investigate':
+          // Move toward last known position
+          if (zombie.lastKnownPlayerX !== null) {
+            const angleToLastKnown = Phaser.Math.Angle.Between(
+              zombie.x, zombie.y,
+              zombie.lastKnownPlayerX, zombie.lastKnownPlayerY
+            );
+            const distToLastKnown = Phaser.Math.Distance.Between(
+              zombie.x, zombie.y,
+              zombie.lastKnownPlayerX, zombie.lastKnownPlayerY
+            );
+
+            if (distToLastKnown > 20) {
+              const investSpeed = this.config.zombieSpeed;
+              zombie.body.setVelocity(
+                Math.cos(angleToLastKnown) * investSpeed,
+                Math.sin(angleToLastKnown) * investSpeed
+              );
+              zombie.rotation = angleToLastKnown + Math.PI / 2;
+            } else {
+              // Reached last known position, look around
+              zombie.body.setVelocity(0, 0);
+              zombie.investigateTimer += delta;
+              zombie.rotation += 0.02; // Slowly turn to look around
+              if (zombie.investigateTimer > 3000) {
+                zombie.investigateTimer = 0;
+                zombie.lastKnownPlayerX = null;
+                zombie.lastKnownPlayerY = null;
+                zombie.alertLevel = 15;
+              }
+            }
+          }
+          break;
+
+        case 'alert':
+          // Stop and look around suspiciously
+          zombie.body.setVelocity(0, 0);
+          zombie.wanderTimer += delta;
+          if (zombie.wanderTimer > 500) {
+            zombie.wanderTimer = 0;
+            // Turn to face a random direction
+            zombie.rotation += (Math.random() - 0.5) * 1.5;
+          }
+          break;
+
+        case 'idle':
+        default:
+          // Slow random wandering
+          zombie.wanderTimer += delta;
+          if (zombie.wanderTimer > 2000) {
+            zombie.wanderTimer = 0;
+            zombie.wanderAngle = Math.random() * Math.PI * 2;
+          }
+          const idleSpeed = 15;
+          zombie.body.setVelocity(
+            Math.cos(zombie.wanderAngle) * idleSpeed,
+            Math.sin(zombie.wanderAngle) * idleSpeed
+          );
+          // Slowly turn toward movement direction
+          const targetRotation = zombie.wanderAngle + Math.PI / 2;
+          zombie.rotation = Phaser.Math.Angle.RotateTo(zombie.rotation, targetRotation, 0.02);
+          break;
       }
     });
   }
