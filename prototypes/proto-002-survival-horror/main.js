@@ -853,63 +853,80 @@ class GameScene extends Phaser.Scene {
   // ==========================================
 
   createLighting() {
-    // Create a RenderTexture for the darkness layer
-    this.darkRT = this.add.renderTexture(0, 0, this.WORLD.width, this.WORLD.height);
-    this.darkRT.setDepth(100);
-
-    // Graphics for drawing to the render texture
-    this.lightGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+    // Use a simple graphics overlay instead of RenderTexture for proper scaling
+    this.darkness = this.add.graphics();
+    this.darkness.setDepth(100);
   }
 
   updateLighting() {
-    const graphics = this.lightGraphics;
+    const graphics = this.darkness;
     graphics.clear();
 
     const px = this.player.x;
     const py = this.player.y;
+    const w = this.WORLD.width;
+    const h = this.WORLD.height;
 
-    // Full darkness layer
+    // Flashlight parameters
+    const angle = this.player.rotation - Math.PI / 2;
+    const range = this.config.flashlightRange;
+    const spread = Phaser.Math.DegToRad(this.config.flashlightAngle);
+    const segments = 24;
     const darknessAlpha = this.flashlightOn ? 0.85 : 0.95;
-    graphics.fillStyle(0x000000, darknessAlpha);
-    graphics.fillRect(0, 0, this.WORLD.width, this.WORLD.height);
 
-    // Clear the render texture and draw darkness
-    this.darkRT.clear();
-    this.darkRT.draw(graphics);
-
-    // Now erase the light areas from the render texture
-    const eraseGraphics = this.make.graphics({ x: 0, y: 0, add: false });
-
-    // Flashlight cone (only if on)
+    // Build the light cone points
+    const conePoints = [];
     if (this.flashlightOn) {
-      const angle = this.player.rotation - Math.PI / 2;
-      const range = this.config.flashlightRange;
-      const spread = Phaser.Math.DegToRad(this.config.flashlightAngle);
-      const segments = 24;
-
-      // Main cone
-      eraseGraphics.fillStyle(0xffffff, 1);
-      eraseGraphics.beginPath();
-      eraseGraphics.moveTo(px, py);
+      conePoints.push({ x: px, y: py });
       for (let i = 0; i <= segments; i++) {
         const a = angle - spread + (spread * 2 * i / segments);
-        const x = px + Math.cos(a) * range;
-        const y = py + Math.sin(a) * range;
-        eraseGraphics.lineTo(x, y);
+        conePoints.push({
+          x: px + Math.cos(a) * range,
+          y: py + Math.sin(a) * range
+        });
       }
-      eraseGraphics.closePath();
-      eraseGraphics.fillPath();
-
-      // Small ambient around player
-      eraseGraphics.fillCircle(px, py, 40);
-    } else {
-      // Very small ambient light when flashlight off
-      eraseGraphics.fillCircle(px, py, 18);
     }
 
-    // Erase the light cone from darkness
-    this.darkRT.erase(eraseGraphics);
-    eraseGraphics.destroy();
+    // Draw darkness with hole for flashlight using path winding
+    graphics.fillStyle(0x000000, darknessAlpha);
+
+    // Outer rectangle (clockwise)
+    graphics.beginPath();
+    graphics.moveTo(0, 0);
+    graphics.lineTo(w, 0);
+    graphics.lineTo(w, h);
+    graphics.lineTo(0, h);
+    graphics.lineTo(0, 0);
+
+    // Inner cone hole (counter-clockwise to create hole)
+    if (this.flashlightOn && conePoints.length > 0) {
+      // Add ambient circle first (approximate with polygon)
+      const ambientRadius = 40;
+      const ambientSegments = 16;
+      graphics.moveTo(px + ambientRadius, py);
+      for (let i = ambientSegments; i >= 0; i--) {
+        const a = (i / ambientSegments) * Math.PI * 2;
+        graphics.lineTo(px + Math.cos(a) * ambientRadius, py + Math.sin(a) * ambientRadius);
+      }
+
+      // Add cone hole (counter-clockwise)
+      graphics.moveTo(conePoints[conePoints.length - 1].x, conePoints[conePoints.length - 1].y);
+      for (let i = conePoints.length - 2; i >= 0; i--) {
+        graphics.lineTo(conePoints[i].x, conePoints[i].y);
+      }
+    } else {
+      // Small ambient only when flashlight off
+      const ambientRadius = 18;
+      const ambientSegments = 12;
+      graphics.moveTo(px + ambientRadius, py);
+      for (let i = ambientSegments; i >= 0; i--) {
+        const a = (i / ambientSegments) * Math.PI * 2;
+        graphics.lineTo(px + Math.cos(a) * ambientRadius, py + Math.sin(a) * ambientRadius);
+      }
+    }
+
+    graphics.closePath();
+    graphics.fillPath();
   }
 
   toggleFlashlight() {
