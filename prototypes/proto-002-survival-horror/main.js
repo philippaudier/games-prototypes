@@ -527,6 +527,13 @@ class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.items, this.handleItem, null, this);
     this.physics.add.overlap(this.player, this.zombies, this.handleZombieAttack, null, this);
 
+    // Boss collision (if boss exists in this room)
+    if (this.boss) {
+      this.physics.add.overlap(this.player, this.boss, this.handleBossAttack, null, this);
+      this.physics.add.collider(this.boss, this.walls);
+      this.physics.add.collider(this.boss, this.furniture);
+    }
+
     // Room name display
     this.showRoomName(room.name, room.isSafe);
   }
@@ -671,10 +678,7 @@ class GameScene extends Phaser.Scene {
     this.boss.attackCooldown = 0;
     this.boss.chargeTimer = 0;
 
-    // Boss collision with player
-    this.physics.add.overlap(this.player, this.boss, this.handleBossAttack, null, this);
-    this.physics.add.collider(this.boss, this.walls);
-    this.physics.add.collider(this.boss, this.furniture);
+    // Note: Collision setup done in createRoom() after player is created
 
     // Create boss health bar
     this.bossHealthBar = this.add.graphics();
