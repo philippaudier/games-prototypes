@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0a0808">
+  <link rel="manifest" href="manifest.json">
+  <title>Survival Horror</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+    }
+    body {
+      background: #0a0808;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    #game-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+    }
+
+    #game {
+      border-radius: 4px;
+      box-shadow:
+        0 0 30px rgba(139, 0, 0, 0.2),
+        inset 0 0 60px rgba(0, 0, 0, 0.5);
+      flex-shrink: 0;
+    }
+    #game canvas {
+      border-radius: 4px;
+      display: block;
+    }
+
+    /* Start screen */
+    #start-screen {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      background: rgba(10, 8, 8, 0.98);
+      z-index: 2000;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    #start-screen h1 {
+      color: #8b0000;
+      font-size: 42px;
+      margin-bottom: 10px;
+      text-shadow: 0 0 30px rgba(139, 0, 0, 0.8);
+      letter-spacing: 4px;
+    }
+    #start-screen .subtitle {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 40px;
+      letter-spacing: 2px;
+    }
+    #start-screen .tap-hint {
+      color: #aa4444;
+      font-size: 20px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    /* Desktop controls hint */
+    #controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      padding: 10px 20px;
+      border-radius: 8px;
+      color: #666;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 100;
+    }
+    #controls span { margin: 0 10px; }
+    #controls .key {
+      background: #222;
+      padding: 2px 8px;
+      border-radius: 4px;
+      color: #8b0000;
+      font-weight: bold;
+    }
+
+    /* Mobile touch controls */
+    .touch-zone-left,
+    .touch-zone-right {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+      padding: 10px;
+    }
+
+    .touch-zone-left {
+      padding-left: env(safe-area-inset-left, 10px);
+    }
+    .touch-zone-right {
+      padding-right: env(safe-area-inset-right, 10px);
+    }
+
+    /* Tank control joystick area */
+    .tank-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .tank-btn {
+      width: 70px;
+      height: 70px;
+      background: rgba(139, 0, 0, 0.2);
+      border: 3px solid rgba(139, 0, 0, 0.5);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(139, 0, 0, 0.8);
+      font-size: 24px;
+      transition: background 0.1s, transform 0.1s;
+    }
+
+    .tank-btn.active {
+      background: rgba(139, 0, 0, 0.5);
+      transform: scale(0.92);
+    }
+
+    .tank-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    /* Action buttons */
+    .action-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .action-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(139, 0, 0, 0.2);
+      border: 3px solid rgba(139, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(200, 100, 100, 0.95);
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+      line-height: 1.2;
+      transition: background 0.1s, transform 0.1s;
+    }
+
+    .action-btn.active {
+      background: rgba(139, 0, 0, 0.5);
+      transform: scale(0.92);
+    }
+
+    /* Show mobile layout on touch devices */
+    @media (hover: none) and (pointer: coarse) {
+      #controls { display: none; }
+      #start-screen { display: flex; }
+
+      #game-container {
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 5px;
+        gap: 5px;
+      }
+
+      .touch-zone-left,
+      .touch-zone-right {
+        display: flex;
+        min-width: 170px;
+        flex: 0 0 auto;
+      }
+
+      #game {
+        flex: 1 1 auto;
+        max-width: calc(100% - 360px);
+        max-height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+    }
+
+    #start-screen.hidden { display: none !important; }
+
+    /* Rotate hint */
+    #rotate-hint {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.95);
+      z-index: 3000;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #8b0000;
+      text-align: center;
+      padding: 20px;
+    }
+
+    #rotate-hint svg {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 20px;
+      animation: rotate-phone 1.5s ease-in-out infinite;
+    }
+
+    @keyframes rotate-phone {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(90deg); }
+    }
+
+    @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+      #rotate-hint { display: flex; }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <!-- Left: Tank controls -->
+    <div class="touch-zone-left">
+      <div class="tank-controls">
+        <div class="tank-btn" data-input="forward">▲</div>
+        <div class="tank-row">
+          <div class="tank-btn" data-input="turnLeft">↺</div>
+          <div class="tank-btn" data-input="turnRight">↻</div>
+        </div>
+        <div class="tank-btn" data-input="backward">▼</div>
+      </div>
+    </div>
+
+    <!-- Center: Game -->
+    <div id="game"></div>
+
+    <!-- Right: Actions -->
+    <div class="touch-zone-right">
+      <div class="action-buttons">
+        <div class="action-btn" data-input="action">USE /<br>PICK</div>
+        <div class="action-btn" data-input="shoot">SHOOT</div>
+        <div class="action-btn" data-input="run">RUN</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Start screen -->
+  <div id="start-screen">
+    <h1>SURVIVAL HORROR</h1>
+    <div class="subtitle">PROTOTYPE 002</div>
+    <div class="tap-hint">TAP TO START</div>
+  </div>
+
+  <!-- Desktop controls -->
+  <div id="controls">
+    <span><span class="key">↑↓</span> Move</span>
+    <span><span class="key">←→</span> Turn</span>
+    <span><span class="key">SPACE</span> Action</span>
+    <span><span class="key">X</span> Shoot</span>
+    <span><span class="key">SHIFT</span> Run</span>
+  </div>
+
+  <!-- Rotate hint -->
+  <div id="rotate-hint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="4" y="2" width="16" height="20" rx="2" ry="2"/>
+      <line x1="12" y1="18" x2="12" y2="18"/>
+    </svg>
+    <p>Please rotate your device<br>to landscape mode</p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script src="./main.js"></script>
+  <script>
+    // Fullscreen API
+    function requestFullscreen(elem) {
+      if (elem.requestFullscreen) return elem.requestFullscreen();
+      if (elem.webkitRequestFullscreen) return elem.webkitRequestFullscreen();
+      if (elem.msRequestFullscreen) return elem.msRequestFullscreen();
+      return Promise.reject('Fullscreen not supported');
+    }
+
+    function toggleFullscreen() {
+      const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      if (isFs) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else {
+        requestFullscreen(document.documentElement).catch(() => {});
+      }
+    }
+
+    // Start screen
+    const startScreen = document.getElementById('start-screen');
+    startScreen.addEventListener('click', () => {
+      startScreen.classList.add('hidden');
+      toggleFullscreen();
+    });
+    startScreen.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      startScreen.classList.add('hidden');
+      toggleFullscreen();
+    });
+
+    // Orientation lock
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('landscape').catch(() => {});
+    }
+
+    // Prevent bounce on iOS
+    document.body.addEventListener('touchmove', (e) => {
+      if (e.target === document.body) e.preventDefault();
+    }, { passive: false });
+  </script>
+</body>
+</html>
