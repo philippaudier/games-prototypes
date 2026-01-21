@@ -1,0 +1,17 @@
+{
+  "name": "Neon Platformer",
+  "short_name": "Platformer",
+  "description": "A neon-style 2D platformer game with procedural generation",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#050510",
+  "theme_color": "#050510",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23050510' width='100' height='100'/><text x='50' y='60' font-size='40' text-anchor='middle' fill='%2300ff88'>NP</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
