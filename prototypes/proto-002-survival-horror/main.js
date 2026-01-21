@@ -853,15 +853,16 @@ class GameScene extends Phaser.Scene {
   // ==========================================
 
   createLighting() {
-    // Dark overlay
-    this.darkness = this.add.graphics();
-    this.darkness.setDepth(100);
+    // Create a RenderTexture for the darkness layer
+    this.darkRT = this.add.renderTexture(0, 0, this.WORLD.width, this.WORLD.height);
+    this.darkRT.setDepth(100);
 
-    // Flashlight mask will be drawn in update
+    // Graphics for drawing to the render texture
+    this.lightGraphics = this.make.graphics({ x: 0, y: 0, add: false });
   }
 
   updateLighting() {
-    const graphics = this.darkness;
+    const graphics = this.lightGraphics;
     graphics.clear();
 
     const px = this.player.x;
@@ -872,8 +873,12 @@ class GameScene extends Phaser.Scene {
     graphics.fillStyle(0x000000, darknessAlpha);
     graphics.fillRect(0, 0, this.WORLD.width, this.WORLD.height);
 
-    // Set blend mode to cut through darkness
-    graphics.blendMode = Phaser.BlendModes.ERASE;
+    // Clear the render texture and draw darkness
+    this.darkRT.clear();
+    this.darkRT.draw(graphics);
+
+    // Now erase the light areas from the render texture
+    const eraseGraphics = this.make.graphics({ x: 0, y: 0, add: false });
 
     // Flashlight cone (only if on)
     if (this.flashlightOn) {
@@ -882,27 +887,29 @@ class GameScene extends Phaser.Scene {
       const spread = Phaser.Math.DegToRad(this.config.flashlightAngle);
       const segments = 24;
 
-      // Main cone - single clean shape
-      graphics.fillStyle(0xffffff, 1);
-      graphics.beginPath();
-      graphics.moveTo(px, py);
+      // Main cone
+      eraseGraphics.fillStyle(0xffffff, 1);
+      eraseGraphics.beginPath();
+      eraseGraphics.moveTo(px, py);
       for (let i = 0; i <= segments; i++) {
         const a = angle - spread + (spread * 2 * i / segments);
         const x = px + Math.cos(a) * range;
         const y = py + Math.sin(a) * range;
-        graphics.lineTo(x, y);
+        eraseGraphics.lineTo(x, y);
       }
-      graphics.closePath();
-      graphics.fillPath();
+      eraseGraphics.closePath();
+      eraseGraphics.fillPath();
 
       // Small ambient around player
-      graphics.fillCircle(px, py, 40);
+      eraseGraphics.fillCircle(px, py, 40);
     } else {
       // Very small ambient light when flashlight off
-      graphics.fillCircle(px, py, 18);
+      eraseGraphics.fillCircle(px, py, 18);
     }
 
-    graphics.blendMode = Phaser.BlendModes.NORMAL;
+    // Erase the light cone from darkness
+    this.darkRT.erase(eraseGraphics);
+    eraseGraphics.destroy();
   }
 
   toggleFlashlight() {
