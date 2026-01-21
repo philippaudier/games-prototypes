@@ -433,10 +433,10 @@ class GameScene extends Phaser.Scene {
   setupInput() {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = {
-      w: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-      a: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-      s: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-      d: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+      z: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z), // Forward
+      s: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S), // Backward
+      q: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q), // Turn left
+      d: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D), // Turn right
       space: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
       x: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X),
       shift: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT)
@@ -763,10 +763,10 @@ class GameScene extends Phaser.Scene {
 
     const touch = this.touchInput || {};
 
-    // Tank controls
-    const forward = this.cursors.up.isDown || this.keys.w.isDown || touch.forward;
+    // Tank controls (AZERTY: Z=forward, S=backward, Q=turn left, D=turn right)
+    const forward = this.cursors.up.isDown || this.keys.z.isDown || touch.forward;
     const backward = this.cursors.down.isDown || this.keys.s.isDown || touch.backward;
-    const turnLeft = this.cursors.left.isDown || this.keys.a.isDown || touch.turnLeft;
+    const turnLeft = this.cursors.left.isDown || this.keys.q.isDown || touch.turnLeft;
     const turnRight = this.cursors.right.isDown || this.keys.d.isDown || touch.turnRight;
     const running = this.keys.shift.isDown || touch.run;
     const shootPressed = Phaser.Input.Keyboard.JustDown(this.keys.x) || touch.shootJustPressed;
