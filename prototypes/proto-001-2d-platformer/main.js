@@ -10,8 +10,9 @@ class GameScene extends Phaser.Scene {
     this.score = data.score || 0;
     this.levelTime = 0; // Chrono du niveau en ms
     this.totalTime = data.totalTime || 0; // Timer total du run
-    this.maxHealth = data.maxHealth || 3; // Vies max persistantes
-    this.currentHealth = data.currentHealth || this.maxHealth; // Vie actuelle (persistante)
+    this.maxHealth = data.maxHealth || 3; // Nombre de coeurs max
+    // HP en quarts: 4 HP = 1 coeur plein
+    this.currentHealth = data.currentHealth !== undefined ? data.currentHealth : this.maxHealth * 4;
     this.isTransitioning = false; // Flag pour éviter les transitions multiples
 
     // Charger les meilleurs temps depuis localStorage
@@ -26,6 +27,19 @@ class GameScene extends Phaser.Scene {
       localStorage.removeItem('platformer-checkpoint');
       this.checkpoint = null;
     }
+  }
+
+  preload() {
+    // Charger les sprites
+    this.load.image('player', 'assets/sunday.png');
+    this.load.image('key', 'assets/key.png');
+    this.load.image('door_closed', 'assets/closed.png');
+    this.load.image('door_opened', 'assets/opened.png');
+    // Coeurs fractionnels
+    this.load.image('heart_full', 'assets/heart_full.png');
+    this.load.image('heart_3', 'assets/heart_3.png');
+    this.load.image('heart_demi', 'assets/heart_demi.png');
+    this.load.image('heart_1', 'assets/heart_1.png');
   }
 
   create() {
@@ -81,7 +95,7 @@ class GameScene extends Phaser.Scene {
     // Variables joueur
     this.coyoteTimer = 0;
     this.jumpBufferTimer = 0;
-    this.playerHealth = this.currentHealth; // Vie persistante entre niveaux
+    this.playerHealth = this.currentHealth; // HP en quarts (4 HP = 1 coeur)
     this.isInvincible = true; // Invincible au spawn
     this.canMove = false; // Freeze au spawn
     this.hasKey = false;
@@ -1565,6 +1579,39 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  particleDoorUnlock(x, y) {
+    // Effet spectaculaire d'ouverture de porte - particules qui montent
+    this.emitParticles(x, y - 50, {
+      count: 30,
+      colors: [0x00ff88, 0x00ffaa, 0x88ffcc, 0xffffff],
+      minSpeed: 80,
+      maxSpeed: 200,
+      minSize: 4,
+      maxSize: 10,
+      life: 800,
+      spread: Math.PI * 0.8,
+      baseAngle: -Math.PI / 2, // Vers le haut
+      gravity: -100,
+      fadeOut: true,
+      shrink: true,
+      shape: 'star'
+    });
+    // Deuxième vague - particules latérales
+    this.emitParticles(x, y - 30, {
+      count: 20,
+      colors: [0x00ff88, 0xffffff],
+      minSpeed: 40,
+      maxSpeed: 100,
+      minSize: 2,
+      maxSize: 6,
+      life: 600,
+      spread: Math.PI,
+      baseAngle: 0,
+      gravity: 50,
+      fadeOut: true
+    });
+  }
+
   particleEnemyDeath(x, y, color = 0xff4444) {
     this.emitParticles(x, y, {
       count: 12,
@@ -1683,26 +1730,13 @@ class GameScene extends Phaser.Scene {
     this.keyIconStem = this.add.rectangle(padding + 88, padding + 28, 3, 8, 0x555555)
       .setScrollFactor(0).setDepth(uiDepth + 2);
 
-    // === ZONE CENTRE-HAUT : Niveau + Vies ===
+    // === ZONE CENTRE-HAUT : Vies uniquement ===
     const isBossLevel = this.currentLevel % 5 === 0;
-    const levelColor = isBossLevel ? '#ff00ff' : '#00ff88';
     const centerX = vw / 2;
 
-    this.levelText = this.add.text(centerX, padding, `NIVEAU ${this.currentLevel}`, {
-      ...textStyle,
-      fontSize: isBossLevel ? '16px' : '14px',
-      fill: levelColor,
-      fontStyle: 'bold'
-    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(uiDepth + 1);
-
-    if (isBossLevel) {
-      this.add.text(centerX, padding + 18, '[ BOSS ]', {
-        ...textStyle, fontSize: '10px', fill: '#ff00ff'
-      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(uiDepth + 1);
-    }
-
+    // Le nom du niveau est affiché dans l'intro, pas besoin de le garder en permanence
     // Vies - affichage moderne avec icônes
-    this.healthContainer = this.add.container(centerX, isBossLevel ? padding + 34 : padding + 20).setScrollFactor(0).setDepth(uiDepth + 1);
+    this.healthContainer = this.add.container(centerX, padding + 16).setScrollFactor(0).setDepth(uiDepth + 1);
     this.updateHealthDisplay();
 
     // === ZONE DROITE : Timers ===
@@ -1738,29 +1772,14 @@ class GameScene extends Phaser.Scene {
   }
 
   createKeySprite(x, y, skipAnimation = false) {
-    // Clé stylisée en formes géométriques
-    const keyContainer = this.add.container(x, y);
-
-    // Tête de la clé (cercle)
-    const head = this.add.circle(0, -8, 10, 0xffd700);
-    head.setStrokeStyle(2, 0xcc9900);
-    // Trou dans la tête
-    const hole = this.add.circle(0, -8, 4, 0x000000, 0.5);
-
-    // Tige
-    const stem = this.add.rectangle(0, 8, 5, 20, 0xffd700);
-    stem.setStrokeStyle(1, 0xcc9900);
-
-    // Dents
-    const tooth1 = this.add.rectangle(5, 14, 6, 4, 0xffd700);
-    const tooth2 = this.add.rectangle(5, 20, 8, 4, 0xffd700);
-
-    keyContainer.add([stem, tooth1, tooth2, head, hole]);
+    // Sprite de clé (16x28 scalé x2)
+    const keySprite = this.add.sprite(x, y, 'key');
+    keySprite.setScale(2); // 16x28 -> 32x56
 
     // Animation de flottement (seulement si pas skipAnimation)
     if (!skipAnimation) {
       this.tweens.add({
-        targets: keyContainer,
+        targets: keySprite,
         y: y - 8,
         duration: 1000,
         yoyo: true,
@@ -1770,7 +1789,7 @@ class GameScene extends Phaser.Scene {
 
       // Rotation légère
       this.tweens.add({
-        targets: keyContainer,
+        targets: keySprite,
         angle: { from: -5, to: 5 },
         duration: 1500,
         yoyo: true,
@@ -1779,33 +1798,102 @@ class GameScene extends Phaser.Scene {
       });
     }
 
-    return keyContainer;
+    return keySprite;
   }
 
   updateHealthDisplay() {
+    const oldHealth = this.previousHealth || this.playerHealth;
+    this.previousHealth = this.playerHealth;
+    const healthChanged = oldHealth !== this.playerHealth;
+    const tookDamage = this.playerHealth < oldHealth;
+    const healed = this.playerHealth > oldHealth;
+
     this.healthContainer.removeAll(true);
-    const heartSize = 18;
-    const spacing = 22;
+    const spacing = 36; // 16x16 sprite scaled x2 = 32px + 4px gap
     const totalWidth = this.maxHealth * spacing;
     const startX = -totalWidth / 2 + spacing / 2;
 
-    for (let i = 0; i < this.maxHealth; i++) {
-      const isFilled = i < this.playerHealth;
-      const heart = this.add.text(startX + i * spacing, 0, isFilled ? '❤️' : '🖤', {
-        fontSize: `${heartSize}px`
-      }).setOrigin(0.5);
+    // Stocker les sprites pour les animations
+    this.heartSprites = [];
 
-      if (isFilled) {
-        // Petit effet de pulsation sur les coeurs pleins
+    for (let i = 0; i < this.maxHealth; i++) {
+      // Calculer combien de HP ce coeur contient (0-4)
+      const heartHp = Math.max(0, Math.min(4, this.playerHealth - i * 4));
+
+      // Choisir le sprite selon les HP
+      let spriteKey;
+      if (heartHp >= 4) {
+        spriteKey = 'heart_full';
+      } else if (heartHp === 3) {
+        spriteKey = 'heart_3';
+      } else if (heartHp === 2) {
+        spriteKey = 'heart_demi';
+      } else if (heartHp === 1) {
+        spriteKey = 'heart_1';
+      } else {
+        spriteKey = 'heart_full'; // Vide = full avec tint gris
+      }
+
+      const heart = this.add.sprite(startX + i * spacing, 0, spriteKey);
+      heart.setScale(2);
+      heart.setOrigin(0.5);
+      this.heartSprites.push(heart);
+
+      if (heartHp === 0) {
+        // Coeur vide - gris foncé
+        heart.setTint(0x333333);
+      } else if (heartHp === 4) {
+        // Coeur plein - effet de pulsation
         this.tweens.add({
           targets: heart,
-          scale: 1.1,
+          scale: 2.2,
           duration: 500 + i * 100,
           yoyo: true,
           repeat: -1,
           ease: 'Sine.easeInOut'
         });
       }
+
+      // Animation de transition
+      if (healthChanged) {
+        const oldHeartHp = Math.max(0, Math.min(4, oldHealth - i * 4));
+        const heartChanged = oldHeartHp !== heartHp;
+
+        if (heartChanged) {
+          if (tookDamage && heartHp < oldHeartHp) {
+            // Animation de dégâts - shake et flash rouge
+            heart.setTint(0xff0000);
+            this.tweens.add({
+              targets: heart,
+              x: heart.x + 3,
+              duration: 30,
+              yoyo: true,
+              repeat: 5,
+              onComplete: () => {
+                if (heartHp === 0) {
+                  heart.setTint(0x333333);
+                } else {
+                  heart.clearTint();
+                }
+              }
+            });
+          } else if (healed && heartHp > oldHeartHp) {
+            // Animation de soin - scale up avec flash vert
+            heart.setTint(0x00ff00);
+            heart.setScale(0.5);
+            this.tweens.add({
+              targets: heart,
+              scale: 2,
+              duration: 200,
+              ease: 'Back.easeOut',
+              onComplete: () => {
+                heart.clearTint();
+              }
+            });
+          }
+        }
+      }
+
       this.healthContainer.add(heart);
     }
   }
@@ -2172,14 +2260,16 @@ class GameScene extends Phaser.Scene {
     const { platformData, doorX, doorY, keyX, keyY } = tileResult;
 
     // Player spawn
-    // Joueur - taille réduite pour meilleur gameplay (style Celeste)
-    this.player = this.add.rectangle(60, this.WORLD.groundY - 30, 16, 28, 0x00ff88);
-    this.player.setStrokeStyle(2, 0x00cc66);
+    // Joueur - sprite "Sunday" (16x28 scalé x2)
+    this.player = this.add.sprite(60, this.WORLD.groundY - 30, 'player');
+    this.player.setScale(2); // 16x28 -> 32x56
     this.physics.add.existing(this.player);
+    this.player.body.setSize(14, 26); // Hitbox sur le sprite original (avant scale)
+    this.player.body.setOffset(1, 1);
     this.player.body.setCollideWorldBounds(true);
     this.physics.world.setBounds(0, 0, this.WORLD.width, this.WORLD.height + 200);
     this.player.body.setGravityY(this.config.gravity);
-    this.player.body.setMaxVelocityX(this.config.playerSpeed);
+    this.player.body.setMaxVelocity(this.config.playerSpeed, 800); // Limiter vitesse X et Y (évite tunneling)
     this.player.setDepth(50); // Au-dessus de tout
 
     // === SETUP CAMÉRA ===
@@ -2203,17 +2293,20 @@ class GameScene extends Phaser.Scene {
     if (!isBossLevel) {
       this.key = this.createKeySprite(keyX, keyY - 30);
       this.physics.add.existing(this.key, true);
-      // Hitbox généreuse centrée sur la clé (le container a son origine au centre de la clé)
-      this.key.body.setSize(40, 50);
-      this.key.body.setOffset(-20, -25);
+      // Hitbox = taille du sprite original (16x28), centrée automatiquement
+      this.key.body.setSize(16, 28);
       this.physics.add.overlap(this.player, this.key, this.collectKey, null, this);
     }
 
     // Porte - positionnée sur la plateforme déjà créée
-    this.door = this.add.rectangle(doorX, doorY, 35, 50, 0x666666);
-    this.door.setStrokeStyle(2, 0x444444);
+    this.door = this.add.sprite(doorX, doorY, 'door_closed');
+    this.door.setScale(2); // 32x58 -> 64x116
+    this.door.setOrigin(0.5, 1); // Origine en bas au centre pour alignement sur plateforme
     this.doorLocked = true;
     this.physics.add.existing(this.door, true);
+    // Hitbox plus grande pour englober la partie colorée (scaled x2)
+    this.door.body.setSize(48, 100);
+    this.door.body.setOffset(-8, -6); // Centrer la hitbox sur la porte
     this.physics.add.overlap(this.player, this.door, this.enterDoor, null, this);
 
     // Ennemis basiques sur plateformes
@@ -2337,9 +2430,11 @@ class GameScene extends Phaser.Scene {
         : null;
 
       if (heartPlat) {
-        this.heartPickup = this.add.text(heartPlat.x, heartPlat.y - 25, '💖', { fontSize: '24px' }).setOrigin(0.5);
+        this.heartPickup = this.add.sprite(heartPlat.x, heartPlat.y - 25, 'heart_full');
+        this.heartPickup.setScale(2);
+        this.heartPickup.setOrigin(0.5);
         this.physics.add.existing(this.heartPickup, true);
-        this.heartPickup.body.setSize(20, 20);
+        this.heartPickup.body.setSize(16, 16);
         this.physics.add.overlap(this.player, this.heartPickup, this.collectHeart, null, this);
 
         // Petite animation de flottement
@@ -2690,11 +2785,12 @@ class GameScene extends Phaser.Scene {
     const doorCol = this.rng.between(4, this.TILE.COLS - 5);
     const doorPixel = this.tileToPixel(doorCol, doorRow);
     const doorX = doorPixel.x;
-    const doorY = doorPixel.y;
 
     // Plateforme sous la porte (2-3 tiles de large)
     const doorPlatWidth = this.rng.between(2, 3);
     const doorPlatRow = doorRow + 1;
+    // doorY = haut de la plateforme (pour que la porte repose dessus)
+    const doorY = doorPlatRow * this.TILE.SIZE;
     for (let i = 0; i < doorPlatWidth; i++) {
       const col = doorCol - Math.floor(doorPlatWidth / 2) + i;
       if (col >= 0 && col < this.TILE.COLS) {
@@ -3187,14 +3283,16 @@ class GameScene extends Phaser.Scene {
       case 5: this.createArenaSummoner(); break;
     }
 
-    // Player spawn - au centre de l'arène au sol
-    this.player = this.add.rectangle(centerX, groundY - 30, 16, 28, 0x00ff88);
-    this.player.setStrokeStyle(2, 0x00cc66);
+    // Player spawn - au centre de l'arène au sol (sprite "Sunday" 16x28 scalé x2)
+    this.player = this.add.sprite(centerX, groundY - 30, 'player');
+    this.player.setScale(2); // 16x28 -> 32x56
     this.physics.add.existing(this.player);
+    this.player.body.setSize(14, 26);
+    this.player.body.setOffset(1, 1);
     this.player.body.setCollideWorldBounds(true);
     this.physics.world.setBounds(0, 0, this.WORLD.width, this.WORLD.height + 100);
     this.player.body.setGravityY(this.config.gravity);
-    this.player.body.setMaxVelocityX(this.config.playerSpeed);
+    this.player.body.setMaxVelocity(this.config.playerSpeed, 800); // Limiter vitesse X et Y (évite tunneling)
     this.player.setDepth(50);
 
     // === SETUP CAMÉRA BOSS ===
@@ -3216,11 +3314,15 @@ class GameScene extends Phaser.Scene {
     this.setupNewMechanicsCollisions();
 
     // Porte (cachée jusqu'à la victoire)
-    this.door = this.add.rectangle(this.WORLD.width - 40, this.WORLD.groundY - 35, 30, 45, 0x333333);
-    this.door.setStrokeStyle(2, 0x222222);
-    this.door.setAlpha(0.3);
+    this.door = this.add.sprite(this.WORLD.width - 40, this.WORLD.groundY, 'door_closed');
+    this.door.setScale(2); // 32x58 -> 64x116
+    this.door.setOrigin(0.5, 1); // Origine en bas au centre pour alignement sur sol
+    this.door.setAlpha(0.3); // Porte cachée jusqu'à la victoire
     this.doorLocked = true;
     this.physics.add.existing(this.door, true);
+    // Hitbox plus grande pour englober la partie colorée (scaled x2)
+    this.door.body.setSize(48, 100);
+    this.door.body.setOffset(-8, -6);
     this.physics.add.overlap(this.player, this.door, this.enterDoor, null, this);
 
     // Spawn le boss après un court délai
@@ -4935,7 +5037,7 @@ class GameScene extends Phaser.Scene {
     this.checkpoint = checkpointData;
 
     // Restaurer la vie au max après avoir battu un boss !
-    this.playerHealth = this.maxHealth;
+    this.playerHealth = this.maxHealth * 4;
     this.updateHealthDisplay();
 
     // SFX + Particules de victoire
@@ -4994,7 +5096,7 @@ class GameScene extends Phaser.Scene {
     // Faire apparaître la clé (sans animation de flottement pendant la chute)
     this.key = this.createKeySprite(400, 300, true);
     this.physics.add.existing(this.key);
-    this.key.body.setSize(28, 40);
+    this.key.body.setSize(16, 28); // Taille du sprite original
     this.key.body.setAllowGravity(true);
     this.key.body.setGravityY(200); // Chute lente
 
@@ -5060,9 +5162,12 @@ class GameScene extends Phaser.Scene {
     this.keyIcon.setFillStyle(0xffd700);
     this.keyIconStem.setFillStyle(0xffd700);
     this.keyIconBg.setStrokeStyle(2, 0xffd700);
+    // Ouvrir la porte (changer le sprite)
     this.doorLocked = false;
-    this.door.setFillStyle(0x00cc66);
-    this.door.setStrokeStyle(3, 0x00ff88);
+    this.door.setTexture('door_opened');
+    this.door.setAlpha(1); // S'assurer que la porte est visible
+    // Particules d'ouverture
+    this.particleDoorUnlock(this.door.x, this.door.y);
   }
 
   enterDoor() {
@@ -5087,12 +5192,16 @@ class GameScene extends Phaser.Scene {
       localStorage.setItem('platformer-best-total', JSON.stringify(this.bestTotalTime));
     }
 
-    // Arrêter la musique avant de changer de niveau
-    this.stopMusic();
+    // Arrêter la musique seulement si on passe à un niveau boss (la musique de niveau continue sinon)
+    const nextLevel = this.currentLevel + 1;
+    const nextIsBoss = nextLevel % 5 === 0;
+    if (nextIsBoss) {
+      this.stopMusic();
+    }
 
     // Animation de transition puis niveau suivant
     this.playLevelOutro({
-      level: this.currentLevel + 1,
+      level: nextLevel,
       score: this.score,
       totalTime: this.totalTime + this.levelTime,
       maxHealth: this.maxHealth,
@@ -5135,7 +5244,7 @@ class GameScene extends Phaser.Scene {
   takeDamage() {
     if (this.isInvincible) return;
 
-    this.playerHealth--;
+    this.playerHealth -= 4; // 1 coeur = 4 HP
     this.updateHealthDisplay();
 
     if (this.playerHealth <= 0) {
@@ -5151,10 +5260,10 @@ class GameScene extends Phaser.Scene {
           score: this.checkpoint.score,
           totalTime: this.checkpoint.totalTime,
           maxHealth: this.checkpoint.maxHealth,
-          currentHealth: this.checkpoint.maxHealth // Full vie au checkpoint
+          currentHealth: this.checkpoint.maxHealth * 4 // Full vie au checkpoint
         });
       } else {
-        this.scene.restart({ level: 1, score: 0, totalTime: 0, maxHealth: 3, currentHealth: 3 });
+        this.scene.restart({ level: 1, score: 0, totalTime: 0, maxHealth: 3, currentHealth: 12 });
       }
       return;
     }
@@ -5188,9 +5297,8 @@ class GameScene extends Phaser.Scene {
     this.score +=10;
     this.scoreText.setText(this.score.toString().padStart(6, '0'));
 
-    // Récupérer 1/4 d'un coeur (0.25 vie fixe)
-    const healAmount = 0.25;
-    this.playerHealth = Math.min(this.playerHealth + healAmount, this.maxHealth);
+    // Récupérer 1/4 d'un coeur (1 HP)
+    this.playerHealth = Math.min(this.playerHealth + 1, this.maxHealth * 4);
     this.updateHealthDisplay();
   }
 
@@ -5203,13 +5311,13 @@ class GameScene extends Phaser.Scene {
 
     this.heartPickup.destroy();
 
-    // Augmente la vie max ET soigne
+    // Augmente la vie max ET soigne complètement
     this.maxHealth++;
-    this.playerHealth = this.maxHealth;
+    this.playerHealth = this.maxHealth * 4;
     this.updateHealthDisplay();
 
     // Effet visuel
-    const bonusText = this.add.text(this.player.x, this.player.y - 40, '+1 ❤️ MAX!', {
+    const bonusText = this.add.text(this.player.x, this.player.y - 40, '+1 MAX!', {
       fontSize: '18px',
       fill: '#ff6b9d',
       fontStyle: 'bold'
@@ -5232,7 +5340,7 @@ class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.r)) {
       this.stopMusic();
       localStorage.removeItem('platformer-checkpoint'); // Effacer le checkpoint
-      this.scene.restart({ level: 1, score: 0, totalTime: 0, maxHealth: 3, currentHealth: 3 });
+      this.scene.restart({ level: 1, score: 0, totalTime: 0, maxHealth: 3, currentHealth: 12 });
       return;
     }
 
@@ -5599,16 +5707,16 @@ class GameScene extends Phaser.Scene {
       this.guardianShieldSprite.y = this.boss.y;
     }
 
-    // Visual feedback avec états avancés
+    // Visual feedback avec états avancés (tint pour sprites)
     if (this.isDashing) {
       // Dash = blanc cyan brillant
-      this.player.setFillStyle(0x88ffff);
+      this.player.setTint(0x88ffff);
     } else if (this.isClimbing) {
       // Climbing = violet
-      this.player.setFillStyle(0xaa88ff);
+      this.player.setTint(0xaa88ff);
     } else if (onWall && body.velocity.y > 0) {
       // Wall slide = cyan
-      this.player.setFillStyle(0x00ccaa);
+      this.player.setTint(0x00ccaa);
       // Particules de wall slide (peu fréquentes)
       if (Math.random() < 0.15) {
         const wallX = onWallLeft ? this.player.x - 12 : this.player.x + 12;
@@ -5616,13 +5724,13 @@ class GameScene extends Phaser.Scene {
       }
     } else if (!onGround && this.hasDoubleJumped) {
       // Double jump utilisé = vert clair
-      this.player.setFillStyle(0x88cc44);
+      this.player.setTint(0x88cc44);
     } else if (!onGround && this.hasDashedInAir) {
       // Dash utilisé en l'air = orange
-      this.player.setFillStyle(0xffaa44);
+      this.player.setTint(0xffaa44);
     } else {
-      // Normal = vert
-      this.player.setFillStyle(0x00ff88);
+      // Normal = couleur originale du sprite
+      this.player.clearTint();
     }
 
     // Direction du regard (pour le dash sans direction)
@@ -5727,12 +5835,15 @@ const config = {
     default: 'arcade',
     arcade: {
       gravity: { y: 0 },
-      debug: false
+      debug: false,
+      overlapBias: 16,
+      tileBias: 16
     }
   },
   scene: GameScene,
-  pixelArt: false,
-  antialias: true
+  pixelArt: true,
+  antialias: false,
+  roundPixels: true
 };
 
 // Créer le jeu
