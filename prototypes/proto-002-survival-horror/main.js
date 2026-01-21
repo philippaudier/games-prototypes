@@ -519,11 +519,11 @@ class GameScene extends Phaser.Scene {
     // Collisions
     this.physics.add.collider(this.player, this.walls);
     this.physics.add.collider(this.player, this.furniture);
+    this.physics.add.collider(this.player, this.doorZones); // Doors block player
     this.physics.add.collider(this.zombies, this.walls);
     this.physics.add.collider(this.zombies, this.furniture);
 
     // Overlaps
-    this.physics.add.overlap(this.player, this.doorZones, this.handleDoor, null, this);
     this.physics.add.overlap(this.player, this.items, this.handleItem, null, this);
     this.physics.add.overlap(this.player, this.zombies, this.handleZombieAttack, null, this);
 
