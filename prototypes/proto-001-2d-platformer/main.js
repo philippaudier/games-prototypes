@@ -171,8 +171,97 @@ class GameScene extends Phaser.Scene {
       c: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C)  // Dash alternatif 2
     };
 
+    // Mobile touch controls
+    this.initTouchControls();
+
     // Lancer l'animation d'intro du niveau
     this.playLevelIntro();
+  }
+
+  // ==========================================
+  // MOBILE TOUCH CONTROLS
+  // ==========================================
+
+  initTouchControls() {
+    // State for touch inputs
+    this.touchInput = {
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+      jump: false,
+      jumpJustPressed: false,
+      dash: false,
+      dashJustPressed: false
+    };
+
+    // Check if touch device
+    const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    if (!isTouchDevice) return;
+
+    // Get touch control elements
+    const touchButtons = document.querySelectorAll('[data-input]');
+
+    touchButtons.forEach(btn => {
+      const input = btn.dataset.input;
+
+      // Touch start
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        btn.classList.add('active');
+
+        if (input === 'jump') {
+          this.touchInput.jump = true;
+          this.touchInput.jumpJustPressed = true;
+        } else if (input === 'dash') {
+          this.touchInput.dash = true;
+          this.touchInput.dashJustPressed = true;
+        } else {
+          this.touchInput[input] = true;
+        }
+      }, { passive: false });
+
+      // Touch end
+      btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        btn.classList.remove('active');
+
+        if (input === 'jump') {
+          this.touchInput.jump = false;
+        } else if (input === 'dash') {
+          this.touchInput.dash = false;
+        } else {
+          this.touchInput[input] = false;
+        }
+      }, { passive: false });
+
+      // Touch cancel (e.g., finger moves off button)
+      btn.addEventListener('touchcancel', (e) => {
+        btn.classList.remove('active');
+        if (input === 'jump') {
+          this.touchInput.jump = false;
+        } else if (input === 'dash') {
+          this.touchInput.dash = false;
+        } else {
+          this.touchInput[input] = false;
+        }
+      }, { passive: false });
+    });
+
+    // Prevent default touch behaviors on game canvas
+    const gameContainer = document.getElementById('game');
+    if (gameContainer) {
+      gameContainer.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+      gameContainer.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+    }
+  }
+
+  // Reset "just pressed" states (call at end of update)
+  resetTouchJustPressed() {
+    if (this.touchInput) {
+      this.touchInput.jumpJustPressed = false;
+      this.touchInput.dashJustPressed = false;
+    }
   }
 
   // ==========================================
@@ -5091,18 +5180,21 @@ class GameScene extends Phaser.Scene {
       this.wallCoyoteTimer -= delta;
     }
 
-    // === INPUT ===
-    const left = this.canMove && (this.cursors.left.isDown || this.keys.q.isDown);
-    const right = this.canMove && (this.cursors.right.isDown || this.keys.d.isDown);
-    const down = this.canMove && (this.cursors.down.isDown || this.keys.s.isDown);
-    const up = this.canMove && (this.cursors.up.isDown || this.keys.z.isDown);
+    // === INPUT (Keyboard + Touch) ===
+    const touch = this.touchInput || {};
+    const left = this.canMove && (this.cursors.left.isDown || this.keys.q.isDown || touch.left);
+    const right = this.canMove && (this.cursors.right.isDown || this.keys.d.isDown || touch.right);
+    const down = this.canMove && (this.cursors.down.isDown || this.keys.s.isDown || touch.down);
+    const up = this.canMove && (this.cursors.up.isDown || this.keys.z.isDown || touch.up);
     const jumpJustPressed = this.canMove && (Phaser.Input.Keyboard.JustDown(this.keys.z) ||
                             Phaser.Input.Keyboard.JustDown(this.keys.space) ||
-                            Phaser.Input.Keyboard.JustDown(this.cursors.up));
-    const jumpHeld = this.canMove && (this.keys.z.isDown || this.keys.space.isDown || this.cursors.up.isDown);
+                            Phaser.Input.Keyboard.JustDown(this.cursors.up) ||
+                            touch.jumpJustPressed);
+    const jumpHeld = this.canMove && (this.keys.z.isDown || this.keys.space.isDown || this.cursors.up.isDown || touch.jump);
     const dashPressed = this.canMove && (Phaser.Input.Keyboard.JustDown(this.keys.shift) ||
                         Phaser.Input.Keyboard.JustDown(this.keys.x) ||
-                        Phaser.Input.Keyboard.JustDown(this.keys.c));
+                        Phaser.Input.Keyboard.JustDown(this.keys.c) ||
+                        touch.dashJustPressed);
 
     // === JUMP BUFFER ===
     if (jumpJustPressed) {
@@ -5428,6 +5520,9 @@ class GameScene extends Phaser.Scene {
     });
 
     this.isTouchingWall = false;
+
+    // Reset touch "just pressed" states at end of frame
+    this.resetTouchJustPressed();
   }
 
   // === SYSTÈME DE CAMÉRA AVANCÉ ===
@@ -5518,4 +5613,20 @@ document.addEventListener('keydown', (e) => {
       game.scale.startFullscreen();
     }
   }
+});
+
+// Double-tap for fullscreen on mobile
+let lastTap = 0;
+document.getElementById('game').addEventListener('touchend', (e) => {
+  const currentTime = new Date().getTime();
+  const tapLength = currentTime - lastTap;
+  if (tapLength < 300 && tapLength > 0) {
+    if (game.scale.isFullscreen) {
+      game.scale.stopFullscreen();
+    } else {
+      game.scale.startFullscreen();
+    }
+    e.preventDefault();
+  }
+  lastTap = currentTime;
 });
