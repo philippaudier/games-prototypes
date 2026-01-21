@@ -163,22 +163,22 @@
     /* D-Pad */
     .dpad {
       position: relative;
-      width: 130px;
-      height: 130px;
+      width: 180px;
+      height: 180px;
     }
 
     .dpad-btn {
       position: absolute;
-      width: 46px;
-      height: 46px;
-      background: rgba(0, 255, 136, 0.15);
-      border: 2px solid rgba(0, 255, 136, 0.4);
-      border-radius: 10px;
+      width: 64px;
+      height: 64px;
+      background: rgba(0, 255, 136, 0.2);
+      border: 3px solid rgba(0, 255, 136, 0.5);
+      border-radius: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: rgba(0, 255, 136, 0.7);
-      font-size: 18px;
+      color: rgba(0, 255, 136, 0.8);
+      font-size: 26px;
       transition: background 0.1s, transform 0.1s;
     }
 
@@ -200,21 +200,21 @@
     .action-buttons {
       display: flex;
       flex-direction: column;
-      gap: 15px;
+      gap: 20px;
       align-items: center;
     }
 
     .action-btn {
-      width: 65px;
-      height: 65px;
+      width: 85px;
+      height: 85px;
       border-radius: 50%;
-      background: rgba(0, 255, 136, 0.15);
-      border: 2px solid rgba(0, 255, 136, 0.4);
+      background: rgba(0, 255, 136, 0.2);
+      border: 3px solid rgba(0, 255, 136, 0.5);
       display: flex;
       align-items: center;
       justify-content: center;
-      color: rgba(0, 255, 136, 0.9);
-      font-size: 13px;
+      color: rgba(0, 255, 136, 0.95);
+      font-size: 16px;
       font-weight: bold;
       transition: background 0.1s, transform 0.1s;
     }
@@ -240,14 +240,14 @@
       .touch-zone-left,
       .touch-zone-right {
         display: flex;
-        min-width: 140px;
+        min-width: 180px;
         flex: 0 0 auto;
       }
 
       /* Game viewport takes remaining space in center */
       #game {
         flex: 1 1 auto;
-        max-width: calc(100% - 300px); /* Leave space for controls */
+        max-width: calc(100% - 380px); /* Leave space for larger controls */
         max-height: 100%;
         display: flex;
         justify-content: center;
