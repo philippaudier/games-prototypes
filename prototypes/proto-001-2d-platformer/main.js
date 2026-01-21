@@ -20,6 +20,12 @@ class GameScene extends Phaser.Scene {
 
     // Charger le checkpoint depuis localStorage
     this.checkpoint = JSON.parse(localStorage.getItem('platformer-checkpoint') || 'null');
+
+    // Si on commence au niveau 1, effacer tout ancien checkpoint (nouvelle partie)
+    if (this.currentLevel === 1) {
+      localStorage.removeItem('platformer-checkpoint');
+      this.checkpoint = null;
+    }
   }
 
   create() {
@@ -869,46 +875,42 @@ class GameScene extends Phaser.Scene {
   }
 
   playMusicTrack(trackKey) {
-    // Vérifier via l'état GLOBAL si la même piste joue déjà
     const globalMusic = window.gameMusic;
+    const track = this.musicTracks[trackKey];
+    if (!track) return;
 
-    // Si la même piste est marquée comme "en cours", ne pas la redémarrer
-    if (globalMusic.currentType === trackKey && globalMusic.isPlaying) {
+    // Vérifier si cette MÊME piste audio est déjà en train de jouer (vérification directe sur l'objet Audio)
+    if (globalMusic.currentType === trackKey && !track.paused && track.currentTime > 0) {
       // La musique joue déjà, synchroniser les refs locales et sortir
-      this.currentTrack = globalMusic.currentTrack;
-      this.currentMusicType = globalMusic.currentType;
+      this.currentTrack = track;
+      this.currentMusicType = trackKey;
       this.musicPlaying = true;
       return;
     }
 
-    // Arrêter la piste actuelle avec fade out (seulement si c'est une piste différente)
-    if (globalMusic.currentTrack && globalMusic.currentType !== trackKey && globalMusic.isPlaying) {
+    // Arrêter la piste actuelle avec fade out (seulement si c'est une piste différente qui joue)
+    if (globalMusic.currentTrack && globalMusic.currentTrack !== track && !globalMusic.currentTrack.paused) {
       this.fadeOutTrack(globalMusic.currentTrack, 500);
-      globalMusic.isPlaying = false;
     }
 
     // Jouer la nouvelle piste
-    const track = this.musicTracks[trackKey];
-    if (track) {
-      track.currentTime = 0;
-      track.volume = 0;
+    track.currentTime = 0;
+    track.volume = 0;
 
-      this.currentTrack = track;
-      this.currentMusicType = trackKey;
-      this.musicPlaying = true;
+    this.currentTrack = track;
+    this.currentMusicType = trackKey;
+    this.musicPlaying = true;
 
-      // Sauvegarder l'état global
-      globalMusic.currentTrack = track;
-      globalMusic.currentType = trackKey;
-      globalMusic.isPlaying = true;
+    // Sauvegarder l'état global
+    globalMusic.currentTrack = track;
+    globalMusic.currentType = trackKey;
 
-      // Jouer avec fade in
-      track.play().catch(e => {
-        // Autoplay bloqué - sera lancé au premier input utilisateur
-        this.pendingMusic = trackKey;
-      });
-      this.fadeInTrack(track, 500);
-    }
+    // Jouer avec fade in
+    track.play().catch(e => {
+      // Autoplay bloqué - sera lancé au premier input utilisateur
+      this.pendingMusic = trackKey;
+    });
+    this.fadeInTrack(track, 500);
   }
 
   fadeInTrack(track, duration) {
