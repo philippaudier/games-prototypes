@@ -1413,34 +1413,56 @@ class GameScene extends Phaser.Scene {
   // ==========================================
 
   handleDoor(player, door) {
-    const d = door.doorData;
-
-    // Check if pressing action
+    // Keep for physics overlap fallback, but main interaction is distance-based
     const actionPressed = Phaser.Input.Keyboard.JustDown(this.keys.space) ||
                           (this.touchInput && this.touchInput.actionJustPressed);
 
     if (!actionPressed || this.isTransitioning) return;
+    this.useDoor(door);
+  }
 
-    if (d.locked) {
-      if (this.inventory.includes(d.locked)) {
-        this.showMessage(`Used ${d.locked} to unlock the door`);
-        d.locked = null;
-        door.setFillStyle(0x654321);
-        // Don't transition yet, let player press again
-      } else {
-        this.showMessage("It's locked. I need a key.");
+  tryInteract() {
+    if (this.isTransitioning) return;
+
+    const px = this.player.x;
+    const py = this.player.y;
+    const interactRange = 80; // Distance-based interaction range
+
+    // Try to pick up nearby items first
+    let closestItem = null;
+    let closestItemDist = interactRange;
+
+    this.items.getChildren().forEach(item => {
+      const dist = Phaser.Math.Distance.Between(px, py, item.x, item.y);
+      if (dist < closestItemDist) {
+        closestItemDist = dist;
+        closestItem = item;
       }
-    } else {
-      this.transitionToRoom(d.toRoom, d.spawnX, d.spawnY, d.spawnAngle);
+    });
+
+    if (closestItem) {
+      this.pickupItem(closestItem);
+      return;
+    }
+
+    // Try to use nearby doors
+    let closestDoor = null;
+    let closestDoorDist = interactRange;
+
+    this.doorZones.getChildren().forEach(door => {
+      const dist = Phaser.Math.Distance.Between(px, py, door.x, door.y);
+      if (dist < closestDoorDist) {
+        closestDoorDist = dist;
+        closestDoor = door;
+      }
+    });
+
+    if (closestDoor) {
+      this.useDoor(closestDoor);
     }
   }
 
-  handleItem(player, item) {
-    const actionPressed = Phaser.Input.Keyboard.JustDown(this.keys.space) ||
-                          (this.touchInput && this.touchInput.actionJustPressed);
-
-    if (!actionPressed) return;
-
+  pickupItem(item) {
     // Check if inventory is full
     if (this.inventory.length >= this.inventorySize) {
       this.showMessage("Inventory is full!");
@@ -1452,6 +1474,31 @@ class GameScene extends Phaser.Scene {
     this.showMessage(`Picked up: ${data.name}`);
     item.destroy();
     this.updateUI();
+  }
+
+  useDoor(door) {
+    const d = door.doorData;
+
+    if (d.locked) {
+      if (this.inventory.includes(d.locked)) {
+        this.showMessage(`Used ${d.locked} to unlock the door`);
+        d.locked = null;
+        door.setFillStyle(0x654321);
+      } else {
+        this.showMessage("It's locked. I need a key.");
+      }
+    } else {
+      this.transitionToRoom(d.toRoom, d.spawnX, d.spawnY, d.spawnAngle);
+    }
+  }
+
+  handleItem(player, item) {
+    // Keep for physics overlap fallback, but main pickup is distance-based
+    const actionPressed = Phaser.Input.Keyboard.JustDown(this.keys.space) ||
+                          (this.touchInput && this.touchInput.actionJustPressed);
+
+    if (!actionPressed) return;
+    this.pickupItem(item);
   }
 
   handleZombieAttack(player, zombie) {
@@ -1674,6 +1721,12 @@ class GameScene extends Phaser.Scene {
     // Shooting
     if (shootPressed) {
       this.shoot();
+    }
+
+    // Action button - try to pick up items or use doors nearby
+    const actionPressed = Phaser.Input.Keyboard.JustDown(this.keys.space) || touch.actionJustPressed;
+    if (actionPressed) {
+      this.tryInteract();
     }
 
     // Update zombies AI
