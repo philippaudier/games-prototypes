@@ -6,9 +6,11 @@ class GameScene extends Phaser.Scene {
   }
 
   init(data) {
-    this.currentRoom = data.room || 'start';
+    this.currentRoom = data.room || 'entrance';
     this.playerAngle = data.playerAngle || -90; // Face up by default
     this.zombiesKilled = data.zombiesKilled || [];
+    this.bossKilled = data.bossKilled || false;
+    this.flashlightOn = true; // Flashlight toggle
 
     // Inventory system - array of item objects
     this.inventory = data.inventory || [];
@@ -75,66 +77,24 @@ class GameScene extends Phaser.Scene {
   // ==========================================
 
   getRoomData(roomId) {
+    // =====================================================
+    // COMPLETE LEVEL DESIGN - Mansion Nightmare
+    // =====================================================
+    // Layout:
+    //                    [Boss Arena]
+    //                         |
+    //    [Library] --- [Main Hall] --- [Storage]
+    //        |              |              |
+    //   [Study]        [Entrance]     [Basement]
+    //                       |
+    //                  [Safe Room]
+    // =====================================================
+
     const rooms = {
-      'start': {
+      // === ENTRANCE - Starting area ===
+      'entrance': {
         name: 'Entrance Hall',
         bgColor: 0x1a1410,
-        walls: [
-          { x: 0, y: 0, w: 640, h: 20 },      // Top
-          { x: 0, y: 380, w: 640, h: 20 },    // Bottom
-          { x: 0, y: 0, w: 20, h: 400 },      // Left
-          { x: 620, y: 0, w: 20, h: 400 }     // Right
-        ],
-        furniture: [
-          { type: 'table', x: 100, y: 100, w: 80, h: 50 },
-          { type: 'cabinet', x: 500, y: 80, w: 60, h: 100 },
-          { type: 'couch', x: 300, y: 280, w: 120, h: 50 }
-        ],
-        doors: [
-          { x: 300, y: 10, w: 60, h: 20, toRoom: 'corridor', spawnX: 300, spawnY: 360, spawnAngle: -90 }
-        ],
-        items: [
-          { type: 'key', id: 'redKey', x: 530, y: 130, name: 'Red Key' }
-        ],
-        zombies: [
-          { id: 'z1', x: 450, y: 200 }
-        ],
-        playerStart: { x: 320, y: 300 }
-      },
-      'corridor': {
-        name: 'Dark Corridor',
-        bgColor: 0x0f0a08,
-        walls: [
-          { x: 0, y: 0, w: 640, h: 20 },
-          { x: 0, y: 380, w: 640, h: 20 },
-          { x: 0, y: 0, w: 20, h: 400 },
-          { x: 620, y: 0, w: 20, h: 400 },
-          // Corridor walls
-          { x: 100, y: 0, w: 20, h: 150 },
-          { x: 100, y: 250, w: 20, h: 150 },
-          { x: 520, y: 0, w: 20, h: 150 },
-          { x: 520, y: 250, w: 20, h: 150 }
-        ],
-        furniture: [
-          { type: 'barrel', x: 50, y: 100, w: 30, h: 30 },
-          { type: 'barrel', x: 590, y: 300, w: 30, h: 30 }
-        ],
-        doors: [
-          { x: 300, y: 380, w: 60, h: 20, toRoom: 'start', spawnX: 300, spawnY: 50, spawnAngle: 90 },
-          { x: 300, y: 10, w: 60, h: 20, toRoom: 'saferoom', locked: 'redKey', spawnX: 300, spawnY: 360, spawnAngle: -90 }
-        ],
-        items: [
-          { type: 'ammo', id: 'ammo1', x: 580, y: 320, name: 'Handgun Ammo (6)' }
-        ],
-        zombies: [
-          { id: 'z2', x: 300, y: 200 },
-          { id: 'z3', x: 200, y: 150 }
-        ],
-        playerStart: { x: 300, y: 350 }
-      },
-      'saferoom': {
-        name: 'Safe Room',
-        bgColor: 0x1a1815,
         walls: [
           { x: 0, y: 0, w: 640, h: 20 },
           { x: 0, y: 380, w: 640, h: 20 },
@@ -142,21 +102,249 @@ class GameScene extends Phaser.Scene {
           { x: 620, y: 0, w: 20, h: 400 }
         ],
         furniture: [
-          { type: 'savepoint', x: 320, y: 100, w: 50, h: 50 },
-          { type: 'chest', x: 100, y: 200, w: 60, h: 40 },
-          { type: 'table', x: 500, y: 200, w: 80, h: 50 }
+          { type: 'table', x: 150, y: 200, w: 80, h: 50 },
+          { type: 'cabinet', x: 500, y: 200, w: 60, h: 80 },
+          { type: 'carpet', x: 320, y: 200, w: 150, h: 100 }
         ],
         doors: [
-          { x: 300, y: 380, w: 60, h: 20, toRoom: 'corridor', spawnX: 300, spawnY: 50, spawnAngle: 90 }
+          { x: 290, y: 10, w: 60, h: 20, toRoom: 'mainHall', spawnX: 320, spawnY: 340, spawnAngle: -90, label: 'Main Hall' },
+          { x: 290, y: 380, w: 60, h: 20, toRoom: 'saferoom', spawnX: 320, spawnY: 60, spawnAngle: 90, label: 'Safe Room' }
         ],
         items: [
-          { type: 'herb', id: 'herb1', x: 530, y: 210, name: 'Green Herb' }
+          { type: 'note', id: 'note1', x: 170, y: 200, name: 'Dusty Note', description: 'Find the RED KEY in the Library...' }
         ],
         zombies: [],
-        playerStart: { x: 320, y: 300 },
+        playerStart: { x: 320, y: 280 }
+      },
+
+      // === SAFE ROOM - Save and restock ===
+      'saferoom': {
+        name: 'Safe Room',
+        bgColor: 0x151820,
+        walls: [
+          { x: 0, y: 0, w: 640, h: 20 },
+          { x: 0, y: 380, w: 640, h: 20 },
+          { x: 0, y: 0, w: 20, h: 400 },
+          { x: 620, y: 0, w: 20, h: 400 }
+        ],
+        furniture: [
+          { type: 'savepoint', x: 320, y: 200, w: 60, h: 60 },
+          { type: 'chest', x: 100, y: 300, w: 60, h: 40 },
+          { type: 'chest', x: 540, y: 300, w: 60, h: 40 }
+        ],
+        doors: [
+          { x: 290, y: 10, w: 60, h: 20, toRoom: 'entrance', spawnX: 320, spawnY: 340, spawnAngle: -90, label: 'Entrance' }
+        ],
+        items: [
+          { type: 'herb', id: 'herb_safe1', x: 100, y: 280, name: 'Green Herb' },
+          { type: 'ammo', id: 'ammo_safe1', x: 540, y: 280, name: 'Handgun Ammo (6)' }
+        ],
+        zombies: [],
+        playerStart: { x: 320, y: 200 },
         isSafe: true
+      },
+
+      // === MAIN HALL - Central hub ===
+      'mainHall': {
+        name: 'Main Hall',
+        bgColor: 0x1a1612,
+        walls: [
+          { x: 0, y: 0, w: 640, h: 20 },
+          { x: 0, y: 380, w: 640, h: 20 },
+          { x: 0, y: 0, w: 20, h: 160 },
+          { x: 0, y: 240, w: 20, h: 160 },
+          { x: 620, y: 0, w: 20, h: 160 },
+          { x: 620, y: 240, w: 20, h: 160 },
+          // Pillars
+          { x: 150, y: 150, w: 40, h: 40 },
+          { x: 450, y: 150, w: 40, h: 40 },
+          { x: 150, y: 250, w: 40, h: 40 },
+          { x: 450, y: 250, w: 40, h: 40 }
+        ],
+        furniture: [
+          { type: 'statue', x: 320, y: 200, w: 50, h: 50 },
+          { type: 'carpet', x: 320, y: 200, w: 200, h: 150 }
+        ],
+        doors: [
+          { x: 290, y: 380, w: 60, h: 20, toRoom: 'entrance', spawnX: 320, spawnY: 60, spawnAngle: 90, label: 'Entrance' },
+          { x: 290, y: 10, w: 60, h: 20, toRoom: 'bossArena', locked: 'goldKey', spawnX: 320, spawnY: 340, spawnAngle: -90, label: 'Boss Arena (Locked)' },
+          { x: 0, y: 170, w: 20, h: 60, toRoom: 'library', spawnX: 580, spawnY: 200, spawnAngle: 180, label: 'Library' },
+          { x: 620, y: 170, w: 20, h: 60, toRoom: 'storage', spawnX: 60, spawnY: 200, spawnAngle: 0, label: 'Storage' }
+        ],
+        items: [],
+        zombies: [
+          { id: 'z_hall1', x: 200, y: 300 },
+          { id: 'z_hall2', x: 440, y: 300 }
+        ],
+        playerStart: { x: 320, y: 320 }
+      },
+
+      // === LIBRARY - Puzzle room (find red key) ===
+      'library': {
+        name: 'Library',
+        bgColor: 0x1a1815,
+        walls: [
+          { x: 0, y: 0, w: 640, h: 20 },
+          { x: 0, y: 380, w: 640, h: 20 },
+          { x: 0, y: 0, w: 20, h: 400 },
+          { x: 620, y: 0, w: 20, h: 160 },
+          { x: 620, y: 240, w: 20, h: 160 },
+          // Bookshelves
+          { x: 80, y: 60, w: 20, h: 120 },
+          { x: 80, y: 220, w: 20, h: 120 },
+          { x: 200, y: 60, w: 20, h: 120 },
+          { x: 200, y: 220, w: 20, h: 120 }
+        ],
+        furniture: [
+          { type: 'bookshelf', x: 80, y: 120, w: 20, h: 120 },
+          { type: 'bookshelf', x: 200, y: 120, w: 20, h: 120 },
+          { type: 'desk', x: 450, y: 100, w: 100, h: 60 },
+          { type: 'lever', x: 550, y: 320, w: 30, h: 30, id: 'lever1' }
+        ],
+        doors: [
+          { x: 620, y: 170, w: 20, h: 60, toRoom: 'mainHall', spawnX: 60, spawnY: 200, spawnAngle: 0, label: 'Main Hall' },
+          { x: 0, y: 170, w: 20, h: 60, toRoom: 'study', spawnX: 580, spawnY: 200, spawnAngle: 180, label: 'Study' }
+        ],
+        items: [
+          { type: 'key', id: 'redKey', x: 470, y: 100, name: 'Red Key', description: 'Opens red doors.' },
+          { type: 'note', id: 'note2', x: 130, y: 300, name: 'Torn Page', description: 'The gold key is in the basement...' }
+        ],
+        zombies: [
+          { id: 'z_lib1', x: 350, y: 250 }
+        ],
+        playerStart: { x: 580, y: 200 }
+      },
+
+      // === STUDY - Secret room ===
+      'study': {
+        name: 'Study',
+        bgColor: 0x12100e,
+        walls: [
+          { x: 0, y: 0, w: 640, h: 20 },
+          { x: 0, y: 380, w: 640, h: 20 },
+          { x: 0, y: 0, w: 20, h: 400 },
+          { x: 620, y: 0, w: 20, h: 160 },
+          { x: 620, y: 240, w: 20, h: 160 }
+        ],
+        furniture: [
+          { type: 'desk', x: 320, y: 150, w: 120, h: 60 },
+          { type: 'chair', x: 320, y: 220, w: 40, h: 40 },
+          { type: 'painting', x: 100, y: 80, w: 80, h: 60 }
+        ],
+        doors: [
+          { x: 620, y: 170, w: 20, h: 60, toRoom: 'library', spawnX: 60, spawnY: 200, spawnAngle: 0, label: 'Library' }
+        ],
+        items: [
+          { type: 'herb', id: 'herb_study', x: 500, y: 300, name: 'Green Herb' },
+          { type: 'ammo', id: 'ammo_study', x: 100, y: 300, name: 'Handgun Ammo (6)' }
+        ],
+        zombies: [
+          { id: 'z_study1', x: 300, y: 320 }
+        ],
+        playerStart: { x: 580, y: 200 }
+      },
+
+      // === STORAGE - Leads to basement ===
+      'storage': {
+        name: 'Storage Room',
+        bgColor: 0x14120f,
+        walls: [
+          { x: 0, y: 0, w: 640, h: 20 },
+          { x: 0, y: 380, w: 640, h: 20 },
+          { x: 0, y: 0, w: 20, h: 160 },
+          { x: 0, y: 240, w: 20, h: 160 },
+          { x: 620, y: 0, w: 20, h: 400 },
+          // Crates
+          { x: 500, y: 80, w: 60, h: 60 },
+          { x: 500, y: 260, w: 60, h: 60 }
+        ],
+        furniture: [
+          { type: 'crate', x: 500, y: 80, w: 60, h: 60 },
+          { type: 'crate', x: 500, y: 260, w: 60, h: 60 },
+          { type: 'barrel', x: 400, y: 150, w: 40, h: 40 },
+          { type: 'barrel', x: 400, y: 250, w: 40, h: 40 }
+        ],
+        doors: [
+          { x: 0, y: 170, w: 20, h: 60, toRoom: 'mainHall', spawnX: 580, spawnY: 200, spawnAngle: 180, label: 'Main Hall' },
+          { x: 290, y: 380, w: 60, h: 20, toRoom: 'basement', locked: 'redKey', spawnX: 320, spawnY: 60, spawnAngle: 90, label: 'Basement (Locked)' }
+        ],
+        items: [
+          { type: 'ammo', id: 'ammo_storage', x: 150, y: 100, name: 'Handgun Ammo (6)' }
+        ],
+        zombies: [
+          { id: 'z_storage1', x: 300, y: 200 }
+        ],
+        playerStart: { x: 60, y: 200 }
+      },
+
+      // === BASEMENT - Find gold key ===
+      'basement': {
+        name: 'Basement',
+        bgColor: 0x0a0808,
+        walls: [
+          { x: 0, y: 0, w: 640, h: 20 },
+          { x: 0, y: 380, w: 640, h: 20 },
+          { x: 0, y: 0, w: 20, h: 400 },
+          { x: 620, y: 0, w: 20, h: 400 },
+          // Maze walls
+          { x: 150, y: 100, w: 20, h: 150 },
+          { x: 300, y: 150, w: 20, h: 200 },
+          { x: 450, y: 100, w: 20, h: 150 }
+        ],
+        furniture: [
+          { type: 'cage', x: 550, y: 300, w: 50, h: 50 }
+        ],
+        doors: [
+          { x: 290, y: 10, w: 60, h: 20, toRoom: 'storage', spawnX: 320, spawnY: 340, spawnAngle: -90, label: 'Storage' }
+        ],
+        items: [
+          { type: 'key', id: 'goldKey', x: 560, y: 320, name: 'Gold Key', description: 'Opens the boss chamber.' },
+          { type: 'herb', id: 'herb_basement', x: 80, y: 300, name: 'Green Herb' }
+        ],
+        zombies: [
+          { id: 'z_base1', x: 100, y: 200 },
+          { id: 'z_base2', x: 400, y: 300 },
+          { id: 'z_base3', x: 550, y: 150 }
+        ],
+        playerStart: { x: 320, y: 60 }
+      },
+
+      // === BOSS ARENA - Final fight ===
+      'bossArena': {
+        name: 'THE CHAMBER',
+        bgColor: 0x200808,
+        walls: [
+          { x: 0, y: 0, w: 640, h: 20 },
+          { x: 0, y: 380, w: 640, h: 20 },
+          { x: 0, y: 0, w: 20, h: 400 },
+          { x: 620, y: 0, w: 20, h: 400 },
+          // Pillars for cover
+          { x: 150, y: 150, w: 40, h: 40 },
+          { x: 450, y: 150, w: 40, h: 40 },
+          { x: 150, y: 270, w: 40, h: 40 },
+          { x: 450, y: 270, w: 40, h: 40 }
+        ],
+        furniture: [
+          { type: 'throne', x: 320, y: 60, w: 80, h: 50 }
+        ],
+        doors: [
+          { x: 290, y: 380, w: 60, h: 20, toRoom: 'mainHall', spawnX: 320, spawnY: 60, spawnAngle: 90, label: 'Main Hall' }
+        ],
+        items: [
+          { type: 'ammo', id: 'ammo_boss1', x: 80, y: 350, name: 'Handgun Ammo (6)' },
+          { type: 'ammo', id: 'ammo_boss2', x: 560, y: 350, name: 'Handgun Ammo (6)' },
+          { type: 'herb', id: 'herb_boss', x: 320, y: 350, name: 'First Aid Spray' }
+        ],
+        zombies: [],
+        boss: { id: 'boss1', x: 320, y: 100, type: 'tyrant' },
+        playerStart: { x: 320, y: 320 },
+        isBossRoom: true
       }
     };
+
+    // Compatibility: 'start' maps to 'entrance'
+    if (roomId === 'start') roomId = 'entrance';
+
     return rooms[roomId];
   }
 
@@ -270,6 +458,11 @@ class GameScene extends Phaser.Scene {
         this.createZombie(z.x, z.y, z.id);
       }
     });
+
+    // Create boss if present and not killed
+    if (room.boss && !this.bossKilled) {
+      this.createBoss(room.boss.x, room.boss.y, room.boss.id, room.boss.type);
+    }
 
     // Create player
     const spawnX = this.spawnX || room.playerStart.x;
@@ -392,6 +585,227 @@ class GameScene extends Phaser.Scene {
   }
 
   // ==========================================
+  // BOSS
+  // ==========================================
+
+  createBoss(x, y, id, type) {
+    this.boss = this.add.container(x, y);
+
+    // Shadow
+    const shadow = this.add.ellipse(0, 15, 60, 25, 0x000000, 0.5);
+    this.boss.add(shadow);
+
+    // Body (large, dark red)
+    const body = this.add.ellipse(0, 0, 50, 70, 0x4a1515);
+    body.setStrokeStyle(3, 0x2a0808);
+    this.boss.add(body);
+
+    // Head
+    const head = this.add.circle(0, -30, 18, 0x5a2020);
+    head.setStrokeStyle(2, 0x3a1010);
+    this.boss.add(head);
+
+    // Eyes (glowing yellow)
+    const eye1 = this.add.circle(-8, -32, 4, 0xffff00);
+    const eye2 = this.add.circle(8, -32, 4, 0xffff00);
+    this.boss.add(eye1);
+    this.boss.add(eye2);
+
+    // Arms
+    const arm1 = this.add.ellipse(-30, 0, 15, 40, 0x4a1515);
+    const arm2 = this.add.ellipse(30, 0, 15, 40, 0x4a1515);
+    this.boss.add(arm1);
+    this.boss.add(arm2);
+
+    this.physics.add.existing(this.boss);
+    this.boss.body.setSize(50, 50);
+    this.boss.body.setOffset(-25, -25);
+
+    this.boss.bossId = id;
+    this.boss.health = 500;
+    this.boss.maxHealth = 500;
+    this.boss.state = 'idle';
+    this.boss.attackCooldown = 0;
+    this.boss.chargeTimer = 0;
+
+    // Boss collision with player
+    this.physics.add.overlap(this.player, this.boss, this.handleBossAttack, null, this);
+    this.physics.add.collider(this.boss, this.walls);
+    this.physics.add.collider(this.boss, this.furniture);
+
+    // Create boss health bar
+    this.bossHealthBar = this.add.graphics();
+    this.bossHealthBar.setDepth(200);
+
+    // Show boss intro
+    this.showMessage('TYRANT AWAKENS!', 3000);
+    this.cameras.main.shake(500, 0.02);
+  }
+
+  handleBossAttack(player, boss) {
+    if (this.isInvincible || !this.boss) return;
+
+    this.playerHealth -= 25;
+    this.isInvincible = true;
+    this.updateUI();
+
+    // Heavy hit effect
+    this.cameras.main.flash(300, 150, 0, 0);
+    this.cameras.main.shake(200, 0.03);
+
+    // Strong knockback
+    const angle = Phaser.Math.Angle.Between(boss.x, boss.y, player.x, player.y);
+    player.body.setVelocity(
+      Math.cos(angle) * 350,
+      Math.sin(angle) * 350
+    );
+
+    this.time.delayedCall(1500, () => {
+      this.isInvincible = false;
+    });
+
+    if (this.playerHealth <= 0) {
+      this.gameOver();
+    }
+  }
+
+  updateBoss(delta) {
+    if (!this.boss || !this.boss.active) return;
+
+    const dist = Phaser.Math.Distance.Between(
+      this.player.x, this.player.y,
+      this.boss.x, this.boss.y
+    );
+
+    const angleToPlayer = Phaser.Math.Angle.Between(
+      this.boss.x, this.boss.y,
+      this.player.x, this.player.y
+    );
+
+    // Boss AI states
+    this.boss.attackCooldown -= delta;
+
+    if (this.boss.state === 'charging') {
+      // Continue charge
+      this.boss.chargeTimer -= delta;
+      if (this.boss.chargeTimer <= 0) {
+        this.boss.state = 'idle';
+        this.boss.body.setVelocity(0, 0);
+      }
+    } else if (dist < 100 && this.boss.attackCooldown <= 0) {
+      // Start charge attack
+      this.boss.state = 'charging';
+      this.boss.chargeTimer = 500;
+      this.boss.attackCooldown = 2000;
+
+      const chargeSpeed = 300;
+      this.boss.body.setVelocity(
+        Math.cos(angleToPlayer) * chargeSpeed,
+        Math.sin(angleToPlayer) * chargeSpeed
+      );
+
+      this.cameras.main.shake(100, 0.01);
+    } else if (dist < 400) {
+      // Chase player
+      this.boss.state = 'chase';
+      const speed = 80;
+      this.boss.body.setVelocity(
+        Math.cos(angleToPlayer) * speed,
+        Math.sin(angleToPlayer) * speed
+      );
+    } else {
+      // Idle
+      this.boss.state = 'idle';
+      this.boss.body.setVelocity(0, 0);
+    }
+
+    // Update boss health bar
+    if (this.bossHealthBar) {
+      this.bossHealthBar.clear();
+      const barWidth = 200;
+      const barHeight = 15;
+      const x = this.WORLD.width / 2 - barWidth / 2;
+      const y = 50;
+
+      // Background
+      this.bossHealthBar.fillStyle(0x333333);
+      this.bossHealthBar.fillRect(x, y, barWidth, barHeight);
+
+      // Health
+      const healthPercent = this.boss.health / this.boss.maxHealth;
+      this.bossHealthBar.fillStyle(0xaa0000);
+      this.bossHealthBar.fillRect(x + 2, y + 2, (barWidth - 4) * healthPercent, barHeight - 4);
+
+      // Border
+      this.bossHealthBar.lineStyle(2, 0xffd700);
+      this.bossHealthBar.strokeRect(x, y, barWidth, barHeight);
+    }
+  }
+
+  shootBoss() {
+    if (!this.boss || !this.boss.active) return false;
+
+    const angle = this.player.rotation - Math.PI / 2;
+    const range = 300;
+    const spreadAngle = Phaser.Math.DegToRad(15);
+
+    const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.boss.x, this.boss.y);
+    const angleToBoss = Phaser.Math.Angle.Between(this.player.x, this.player.y, this.boss.x, this.boss.y);
+    const angleDiff = Math.abs(Phaser.Math.Angle.Wrap(angleToBoss - angle));
+
+    if (dist < range && angleDiff < spreadAngle) {
+      this.boss.health -= 25;
+
+      // Hit effect
+      const blood = this.add.circle(this.boss.x, this.boss.y, 20, 0x880000);
+      this.tweens.add({
+        targets: blood,
+        alpha: 0,
+        scale: 2,
+        duration: 300,
+        onComplete: () => blood.destroy()
+      });
+
+      // Check if boss is dead
+      if (this.boss.health <= 0) {
+        this.defeatBoss();
+      }
+
+      return true;
+    }
+    return false;
+  }
+
+  defeatBoss() {
+    this.bossKilled = true;
+    this.showMessage('TYRANT DEFEATED!', 5000);
+    this.cameras.main.shake(1000, 0.05);
+
+    // Boss death animation
+    this.tweens.add({
+      targets: this.boss,
+      alpha: 0,
+      scaleX: 1.5,
+      scaleY: 0.5,
+      duration: 2000,
+      onComplete: () => {
+        if (this.boss) this.boss.destroy();
+        this.boss = null;
+        if (this.bossHealthBar) {
+          this.bossHealthBar.clear();
+          this.bossHealthBar.destroy();
+          this.bossHealthBar = null;
+        }
+      }
+    });
+
+    // Victory message
+    this.time.delayedCall(3000, () => {
+      this.showMessage('YOU SURVIVED THE NIGHTMARE!', 10000);
+    });
+  }
+
+  // ==========================================
   // LIGHTING
   // ==========================================
 
@@ -407,39 +821,51 @@ class GameScene extends Phaser.Scene {
     const graphics = this.darkness;
     graphics.clear();
 
-    // Full darkness
-    graphics.fillStyle(0x000000, 0.85);
+    // Full darkness (darker if flashlight is off)
+    const darknessAlpha = this.flashlightOn ? 0.8 : 0.95;
+    graphics.fillStyle(0x000000, darknessAlpha);
     graphics.fillRect(0, 0, this.WORLD.width, this.WORLD.height);
 
-    // Flashlight cone (cut out from darkness)
-    graphics.fillStyle(0x000000, 0); // Transparent
+    // Cut out light areas
+    graphics.fillStyle(0x000000, 0);
     graphics.blendMode = Phaser.BlendModes.ERASE;
 
     const px = this.player.x;
     const py = this.player.y;
-    const angle = this.player.rotation - Math.PI / 2;
-    const range = this.config.flashlightRange;
-    const spread = Phaser.Math.DegToRad(this.config.flashlightAngle);
 
-    // Draw flashlight cone
-    graphics.beginPath();
-    graphics.moveTo(px, py);
+    // Flashlight cone (only if on)
+    if (this.flashlightOn) {
+      const angle = this.player.rotation - Math.PI / 2;
+      const range = this.config.flashlightRange;
+      const spread = Phaser.Math.DegToRad(this.config.flashlightAngle);
 
-    const segments = 20;
-    for (let i = 0; i <= segments; i++) {
-      const a = angle - spread + (spread * 2 * i / segments);
-      const x = px + Math.cos(a) * range;
-      const y = py + Math.sin(a) * range;
-      graphics.lineTo(x, y);
+      graphics.beginPath();
+      graphics.moveTo(px, py);
+
+      const segments = 20;
+      for (let i = 0; i <= segments; i++) {
+        const a = angle - spread + (spread * 2 * i / segments);
+        const x = px + Math.cos(a) * range;
+        const y = py + Math.sin(a) * range;
+        graphics.lineTo(x, y);
+      }
+
+      graphics.closePath();
+      graphics.fillPath();
+
+      // Ambient light around player (larger when flashlight on)
+      graphics.fillCircle(px, py, 50);
+    } else {
+      // Very small ambient light when flashlight off
+      graphics.fillCircle(px, py, 25);
     }
 
-    graphics.closePath();
-    graphics.fillPath();
-
-    // Small circle around player (ambient light)
-    graphics.fillCircle(px, py, 40);
-
     graphics.blendMode = Phaser.BlendModes.NORMAL;
+  }
+
+  toggleFlashlight() {
+    this.flashlightOn = !this.flashlightOn;
+    this.showMessage(this.flashlightOn ? 'Flashlight ON' : 'Flashlight OFF', 1000);
   }
 
   // ==========================================
@@ -458,7 +884,8 @@ class GameScene extends Phaser.Scene {
       shift: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
       i: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I), // Inventory
       tab: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TAB), // Inventory alt
-      esc: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC) // Close inventory
+      esc: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC), // Close inventory
+      f: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F) // Flashlight toggle
     };
 
     // Prevent TAB from changing focus
@@ -477,7 +904,9 @@ class GameScene extends Phaser.Scene {
       shootJustPressed: false,
       run: false,
       inventory: false,
-      inventoryJustPressed: false
+      inventoryJustPressed: false,
+      flashlight: false,
+      flashlightJustPressed: false
     };
 
     const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -501,6 +930,9 @@ class GameScene extends Phaser.Scene {
         } else if (input === 'inventory') {
           this.touchInput.inventory = true;
           this.touchInput.inventoryJustPressed = true;
+        } else if (input === 'flashlight') {
+          this.touchInput.flashlight = true;
+          this.touchInput.flashlightJustPressed = true;
         } else {
           this.touchInput[input] = true;
         }
@@ -516,6 +948,8 @@ class GameScene extends Phaser.Scene {
           this.touchInput.shoot = false;
         } else if (input === 'inventory') {
           this.touchInput.inventory = false;
+        } else if (input === 'flashlight') {
+          this.touchInput.flashlight = false;
         } else {
           this.touchInput[input] = false;
         }
@@ -533,6 +967,7 @@ class GameScene extends Phaser.Scene {
       this.touchInput.actionJustPressed = false;
       this.touchInput.shootJustPressed = false;
       this.touchInput.inventoryJustPressed = false;
+      this.touchInput.flashlightJustPressed = false;
     }
   }
 
@@ -813,6 +1248,26 @@ class GameScene extends Phaser.Scene {
     // Remove from inventory
     this.inventory.splice(this.selectedSlot, 1);
 
+    // Create the item on the ground near the player
+    const dropX = this.player.x + (Math.random() - 0.5) * 30;
+    const dropY = this.player.y + (Math.random() - 0.5) * 30;
+
+    const itemSprite = this.add.rectangle(dropX, dropY, 20, 20, item.color || 0xffffff);
+    itemSprite.setStrokeStyle(2, 0xffffff);
+    itemSprite.itemData = { type: item.type, id: itemId, name: item.name };
+    this.physics.add.existing(itemSprite, false);
+    itemSprite.body.setImmovable(true);
+    this.items.add(itemSprite);
+
+    // Item glow animation
+    this.tweens.add({
+      targets: itemSprite,
+      alpha: 0.5,
+      duration: 500,
+      yoyo: true,
+      repeat: -1
+    });
+
     this.showMessage(`Dropped ${item.name}.`);
     this.updateInventoryUI();
 
@@ -994,6 +1449,9 @@ class GameScene extends Phaser.Scene {
         }
       }
     });
+
+    // Check for boss hit
+    this.shootBoss();
   }
 
   // ==========================================
@@ -1088,6 +1546,11 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
+    // Flashlight toggle
+    if (Phaser.Input.Keyboard.JustDown(this.keys.f) || touch.flashlightJustPressed) {
+      this.toggleFlashlight();
+    }
+
     // Tank controls (AZERTY: Z=forward, S=backward, Q=turn left, D=turn right)
     const forward = this.cursors.up.isDown || this.keys.z.isDown || touch.forward;
     const backward = this.cursors.down.isDown || this.keys.s.isDown || touch.backward;
@@ -1127,6 +1590,11 @@ class GameScene extends Phaser.Scene {
 
     // Update zombies AI
     this.updateZombies(delta);
+
+    // Update boss AI
+    if (this.boss && !this.bossKilled) {
+      this.updateBoss(delta);
+    }
 
     // Update lighting
     this.updateLighting();
