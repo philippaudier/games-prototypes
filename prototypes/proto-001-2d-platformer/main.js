@@ -879,19 +879,22 @@ class GameScene extends Phaser.Scene {
     const track = this.musicTracks[trackKey];
     if (!track) return;
 
-    // Vérifier si cette MÊME piste audio est déjà en train de jouer (vérification directe sur l'objet Audio)
-    if (globalMusic.currentType === trackKey && !track.paused && track.currentTime > 0) {
-      // La musique joue déjà, synchroniser les refs locales et sortir
+    // SIMPLE: Si cette piste n'est PAS en pause, elle joue déjà - ne rien faire!
+    if (!track.paused) {
       this.currentTrack = track;
       this.currentMusicType = trackKey;
       this.musicPlaying = true;
+      globalMusic.currentTrack = track;
+      globalMusic.currentType = trackKey;
       return;
     }
 
-    // Arrêter la piste actuelle avec fade out (seulement si c'est une piste différente qui joue)
-    if (globalMusic.currentTrack && globalMusic.currentTrack !== track && !globalMusic.currentTrack.paused) {
-      this.fadeOutTrack(globalMusic.currentTrack, 500);
-    }
+    // Arrêter l'ancienne piste si c'est une piste différente qui joue
+    Object.entries(this.musicTracks).forEach(([key, otherTrack]) => {
+      if (key !== trackKey && !otherTrack.paused) {
+        this.fadeOutTrack(otherTrack, 500);
+      }
+    });
 
     // Jouer la nouvelle piste
     track.currentTime = 0;
@@ -901,13 +904,10 @@ class GameScene extends Phaser.Scene {
     this.currentMusicType = trackKey;
     this.musicPlaying = true;
 
-    // Sauvegarder l'état global
     globalMusic.currentTrack = track;
     globalMusic.currentType = trackKey;
 
-    // Jouer avec fade in
     track.play().catch(e => {
-      // Autoplay bloqué - sera lancé au premier input utilisateur
       this.pendingMusic = trackKey;
     });
     this.fadeInTrack(track, 500);
@@ -2203,8 +2203,9 @@ class GameScene extends Phaser.Scene {
     if (!isBossLevel) {
       this.key = this.createKeySprite(keyX, keyY - 30);
       this.physics.add.existing(this.key, true);
-      this.key.body.setSize(24, 36);
-      this.key.body.setOffset(-12, -18); // Centrer la hitbox sur le visuel de la clé
+      // Hitbox généreuse centrée sur la clé (le container a son origine au centre de la clé)
+      this.key.body.setSize(40, 50);
+      this.key.body.setOffset(-20, -25);
       this.physics.add.overlap(this.player, this.key, this.collectKey, null, this);
     }
 
