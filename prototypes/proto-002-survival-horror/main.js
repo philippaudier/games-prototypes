@@ -864,26 +864,26 @@ class GameScene extends Phaser.Scene {
     const graphics = this.darkness;
     graphics.clear();
 
-    // Full darkness (darker if flashlight is off)
-    const darknessAlpha = this.flashlightOn ? 0.75 : 0.95;
+    const px = this.player.x;
+    const py = this.player.y;
+
+    // Full darkness layer
+    const darknessAlpha = this.flashlightOn ? 0.85 : 0.95;
     graphics.fillStyle(0x000000, darknessAlpha);
     graphics.fillRect(0, 0, this.WORLD.width, this.WORLD.height);
 
-    // Cut out light areas
-    graphics.fillStyle(0x000000, 0);
+    // Set blend mode to cut through darkness
     graphics.blendMode = Phaser.BlendModes.ERASE;
-
-    const px = this.player.x;
-    const py = this.player.y;
 
     // Flashlight cone (only if on)
     if (this.flashlightOn) {
       const angle = this.player.rotation - Math.PI / 2;
       const range = this.config.flashlightRange;
       const spread = Phaser.Math.DegToRad(this.config.flashlightAngle);
-      const segments = 30;
+      const segments = 24;
 
-      // Outer cone (main light)
+      // Main cone - single clean shape
+      graphics.fillStyle(0xffffff, 1);
       graphics.beginPath();
       graphics.moveTo(px, py);
       for (let i = 0; i <= segments; i++) {
@@ -895,42 +895,11 @@ class GameScene extends Phaser.Scene {
       graphics.closePath();
       graphics.fillPath();
 
-      // Bright center cone (inner beam)
-      const innerRange = range * 0.7;
-      const innerSpread = spread * 0.6;
-      graphics.beginPath();
-      graphics.moveTo(px, py);
-      for (let i = 0; i <= segments; i++) {
-        const a = angle - innerSpread + (innerSpread * 2 * i / segments);
-        const x = px + Math.cos(a) * innerRange;
-        const y = py + Math.sin(a) * innerRange;
-        graphics.lineTo(x, y);
-      }
-      graphics.closePath();
-      graphics.fillPath();
-
-      // Extended reach (dim outer glow)
-      const outerRange = range * 1.3;
-      const outerSpread = spread * 1.2;
-      graphics.fillStyle(0x000000, 0);
-      graphics.beginPath();
-      graphics.moveTo(px, py);
-      for (let i = 0; i <= segments; i++) {
-        const a = angle - outerSpread + (outerSpread * 2 * i / segments);
-        // Add slight wobble for realism
-        const wobble = 1 + Math.sin(i * 0.5) * 0.02;
-        const x = px + Math.cos(a) * outerRange * wobble;
-        const y = py + Math.sin(a) * outerRange * wobble;
-        graphics.lineTo(x, y);
-      }
-      graphics.closePath();
-      graphics.fillPath();
-
-      // Ambient light around player (larger when flashlight on)
-      graphics.fillCircle(px, py, 60);
+      // Small ambient around player
+      graphics.fillCircle(px, py, 40);
     } else {
       // Very small ambient light when flashlight off
-      graphics.fillCircle(px, py, 20);
+      graphics.fillCircle(px, py, 18);
     }
 
     graphics.blendMode = Phaser.BlendModes.NORMAL;
