@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+// Phaser loaded via CDN in index.html
 
 class GameScene extends Phaser.Scene {
   constructor() {
