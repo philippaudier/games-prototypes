@@ -20,13 +20,31 @@ class GameScene extends Phaser.Scene {
 
     // Item database
     this.itemDatabase = {
+      // Keys
       'redKey': { name: 'Red Key', type: 'key', description: 'An old red key. Opens red doors.', icon: '🔑', color: 0xff4444 },
       'blueKey': { name: 'Blue Key', type: 'key', description: 'A blue key with strange markings.', icon: '🔑', color: 0x4444ff },
+      'goldKey': { name: 'Gold Key', type: 'key', description: 'Opens the boss chamber.', icon: '🔑', color: 0xffd700 },
+      // Ammo
       'ammo1': { name: 'Handgun Ammo', type: 'ammo', description: 'Standard 9mm rounds. x6', icon: '🔫', color: 0xcccccc, ammoCount: 6 },
       'ammo2': { name: 'Handgun Ammo', type: 'ammo', description: 'Standard 9mm rounds. x6', icon: '🔫', color: 0xcccccc, ammoCount: 6 },
+      'ammo_safe1': { name: 'Handgun Ammo', type: 'ammo', description: 'Standard 9mm rounds. x6', icon: '🔫', color: 0xcccccc, ammoCount: 6 },
+      'ammo_study': { name: 'Handgun Ammo', type: 'ammo', description: 'Standard 9mm rounds. x6', icon: '🔫', color: 0xcccccc, ammoCount: 6 },
+      'ammo_storage': { name: 'Handgun Ammo', type: 'ammo', description: 'Standard 9mm rounds. x6', icon: '🔫', color: 0xcccccc, ammoCount: 6 },
+      'ammo_boss1': { name: 'Handgun Ammo', type: 'ammo', description: 'Standard 9mm rounds. x6', icon: '🔫', color: 0xcccccc, ammoCount: 6 },
+      'ammo_boss2': { name: 'Handgun Ammo', type: 'ammo', description: 'Standard 9mm rounds. x6', icon: '🔫', color: 0xcccccc, ammoCount: 6 },
+      // Herbs
       'herb1': { name: 'Green Herb', type: 'herb', description: 'A medicinal herb. Restores health.', icon: '🌿', color: 0x44aa44, healAmount: 30 },
       'herb2': { name: 'Green Herb', type: 'herb', description: 'A medicinal herb. Restores health.', icon: '🌿', color: 0x44aa44, healAmount: 30 },
-      'firstAid': { name: 'First Aid Spray', type: 'healing', description: 'Fully restores health.', icon: '💊', color: 0x44aaaa, healAmount: 100 }
+      'herb_safe1': { name: 'Green Herb', type: 'herb', description: 'A medicinal herb. Restores health.', icon: '🌿', color: 0x44aa44, healAmount: 30 },
+      'herb_study': { name: 'Green Herb', type: 'herb', description: 'A medicinal herb. Restores health.', icon: '🌿', color: 0x44aa44, healAmount: 30 },
+      'herb_basement': { name: 'Green Herb', type: 'herb', description: 'A medicinal herb. Restores health.', icon: '🌿', color: 0x44aa44, healAmount: 30 },
+      'herb_boss': { name: 'Green Herb', type: 'herb', description: 'A medicinal herb. Restores health.', icon: '🌿', color: 0x44aa44, healAmount: 30 },
+      // Healing
+      'firstAid': { name: 'First Aid Spray', type: 'healing', description: 'Fully restores health.', icon: '💊', color: 0x44aaaa, healAmount: 100 },
+      'firstAid_boss': { name: 'First Aid Spray', type: 'healing', description: 'Fully restores health.', icon: '💊', color: 0x44aaaa, healAmount: 100 },
+      // Notes
+      'note1': { name: 'Dusty Note', type: 'note', description: 'Find the RED KEY in the Library...', icon: '📜', color: 0xf5deb3 },
+      'note2': { name: 'Torn Page', type: 'note', description: 'The gold key is in the basement...', icon: '📜', color: 0xf5deb3 }
     };
   }
 
@@ -44,8 +62,8 @@ class GameScene extends Phaser.Scene {
       turnSpeed: 150, // degrees per second
       zombieSpeed: 40,
       zombieChaseSpeed: 70,
-      flashlightAngle: 45, // degrees
-      flashlightRange: 200
+      flashlightAngle: 55, // degrees (wider cone)
+      flashlightRange: 280 // longer range
     };
 
     // Player state
@@ -96,8 +114,12 @@ class GameScene extends Phaser.Scene {
         name: 'Entrance Hall',
         bgColor: 0x1a1410,
         walls: [
-          { x: 0, y: 0, w: 640, h: 20 },
-          { x: 0, y: 380, w: 640, h: 20 },
+          // Top wall with gap for door (290-350)
+          { x: 0, y: 0, w: 290, h: 20 },
+          { x: 350, y: 0, w: 290, h: 20 },
+          // Bottom wall with gap for door (290-350)
+          { x: 0, y: 380, w: 290, h: 20 },
+          { x: 350, y: 380, w: 290, h: 20 },
           { x: 0, y: 0, w: 20, h: 400 },
           { x: 620, y: 0, w: 20, h: 400 }
         ],
@@ -122,7 +144,9 @@ class GameScene extends Phaser.Scene {
         name: 'Safe Room',
         bgColor: 0x151820,
         walls: [
-          { x: 0, y: 0, w: 640, h: 20 },
+          // Top wall with gap for door (290-350)
+          { x: 0, y: 0, w: 290, h: 20 },
+          { x: 350, y: 0, w: 290, h: 20 },
           { x: 0, y: 380, w: 640, h: 20 },
           { x: 0, y: 0, w: 20, h: 400 },
           { x: 620, y: 0, w: 20, h: 400 }
@@ -149,10 +173,16 @@ class GameScene extends Phaser.Scene {
         name: 'Main Hall',
         bgColor: 0x1a1612,
         walls: [
-          { x: 0, y: 0, w: 640, h: 20 },
-          { x: 0, y: 380, w: 640, h: 20 },
+          // Top wall with gap for door (290-350)
+          { x: 0, y: 0, w: 290, h: 20 },
+          { x: 350, y: 0, w: 290, h: 20 },
+          // Bottom wall with gap for door (290-350)
+          { x: 0, y: 380, w: 290, h: 20 },
+          { x: 350, y: 380, w: 290, h: 20 },
+          // Left wall with gap for door (160-240)
           { x: 0, y: 0, w: 20, h: 160 },
           { x: 0, y: 240, w: 20, h: 160 },
+          // Right wall with gap for door (160-240)
           { x: 620, y: 0, w: 20, h: 160 },
           { x: 620, y: 240, w: 20, h: 160 },
           // Pillars
@@ -186,7 +216,10 @@ class GameScene extends Phaser.Scene {
         walls: [
           { x: 0, y: 0, w: 640, h: 20 },
           { x: 0, y: 380, w: 640, h: 20 },
-          { x: 0, y: 0, w: 20, h: 400 },
+          // Left wall with gap for door (160-240)
+          { x: 0, y: 0, w: 20, h: 160 },
+          { x: 0, y: 240, w: 20, h: 160 },
+          // Right wall with gap for door (160-240)
           { x: 620, y: 0, w: 20, h: 160 },
           { x: 620, y: 240, w: 20, h: 160 },
           // Bookshelves
@@ -250,7 +283,10 @@ class GameScene extends Phaser.Scene {
         bgColor: 0x14120f,
         walls: [
           { x: 0, y: 0, w: 640, h: 20 },
-          { x: 0, y: 380, w: 640, h: 20 },
+          // Bottom wall with gap for door (290-350)
+          { x: 0, y: 380, w: 290, h: 20 },
+          { x: 350, y: 380, w: 290, h: 20 },
+          // Left wall with gap (160-240)
           { x: 0, y: 0, w: 20, h: 160 },
           { x: 0, y: 240, w: 20, h: 160 },
           { x: 620, y: 0, w: 20, h: 400 },
@@ -282,7 +318,9 @@ class GameScene extends Phaser.Scene {
         name: 'Basement',
         bgColor: 0x0a0808,
         walls: [
-          { x: 0, y: 0, w: 640, h: 20 },
+          // Top wall with gap for door (290-350)
+          { x: 0, y: 0, w: 290, h: 20 },
+          { x: 350, y: 0, w: 290, h: 20 },
           { x: 0, y: 380, w: 640, h: 20 },
           { x: 0, y: 0, w: 20, h: 400 },
           { x: 620, y: 0, w: 20, h: 400 },
@@ -315,7 +353,9 @@ class GameScene extends Phaser.Scene {
         bgColor: 0x200808,
         walls: [
           { x: 0, y: 0, w: 640, h: 20 },
-          { x: 0, y: 380, w: 640, h: 20 },
+          // Bottom wall with gap for door (290-350)
+          { x: 0, y: 380, w: 290, h: 20 },
+          { x: 350, y: 380, w: 290, h: 20 },
           { x: 0, y: 0, w: 20, h: 400 },
           { x: 620, y: 0, w: 20, h: 400 },
           // Pillars for cover
@@ -333,7 +373,7 @@ class GameScene extends Phaser.Scene {
         items: [
           { type: 'ammo', id: 'ammo_boss1', x: 80, y: 350, name: 'Handgun Ammo (6)' },
           { type: 'ammo', id: 'ammo_boss2', x: 560, y: 350, name: 'Handgun Ammo (6)' },
-          { type: 'herb', id: 'herb_boss', x: 320, y: 350, name: 'First Aid Spray' }
+          { type: 'healing', id: 'firstAid_boss', x: 320, y: 350, name: 'First Aid Spray' }
         ],
         zombies: [],
         boss: { id: 'boss1', x: 320, y: 100, type: 'tyrant' },
@@ -439,6 +479,9 @@ class GameScene extends Phaser.Scene {
         itemSprite.itemData = item;
         this.physics.add.existing(itemSprite, false);
         itemSprite.body.setImmovable(true);
+        // Larger pickup hitbox (60x60) so items on tables can be reached
+        itemSprite.body.setSize(60, 60);
+        itemSprite.body.setOffset(-20, -20);
         this.items.add(itemSprite);
 
         // Item glow
@@ -822,7 +865,7 @@ class GameScene extends Phaser.Scene {
     graphics.clear();
 
     // Full darkness (darker if flashlight is off)
-    const darknessAlpha = this.flashlightOn ? 0.8 : 0.95;
+    const darknessAlpha = this.flashlightOn ? 0.75 : 0.95;
     graphics.fillStyle(0x000000, darknessAlpha);
     graphics.fillRect(0, 0, this.WORLD.width, this.WORLD.height);
 
@@ -838,26 +881,56 @@ class GameScene extends Phaser.Scene {
       const angle = this.player.rotation - Math.PI / 2;
       const range = this.config.flashlightRange;
       const spread = Phaser.Math.DegToRad(this.config.flashlightAngle);
+      const segments = 30;
 
+      // Outer cone (main light)
       graphics.beginPath();
       graphics.moveTo(px, py);
-
-      const segments = 20;
       for (let i = 0; i <= segments; i++) {
         const a = angle - spread + (spread * 2 * i / segments);
         const x = px + Math.cos(a) * range;
         const y = py + Math.sin(a) * range;
         graphics.lineTo(x, y);
       }
+      graphics.closePath();
+      graphics.fillPath();
 
+      // Bright center cone (inner beam)
+      const innerRange = range * 0.7;
+      const innerSpread = spread * 0.6;
+      graphics.beginPath();
+      graphics.moveTo(px, py);
+      for (let i = 0; i <= segments; i++) {
+        const a = angle - innerSpread + (innerSpread * 2 * i / segments);
+        const x = px + Math.cos(a) * innerRange;
+        const y = py + Math.sin(a) * innerRange;
+        graphics.lineTo(x, y);
+      }
+      graphics.closePath();
+      graphics.fillPath();
+
+      // Extended reach (dim outer glow)
+      const outerRange = range * 1.3;
+      const outerSpread = spread * 1.2;
+      graphics.fillStyle(0x000000, 0);
+      graphics.beginPath();
+      graphics.moveTo(px, py);
+      for (let i = 0; i <= segments; i++) {
+        const a = angle - outerSpread + (outerSpread * 2 * i / segments);
+        // Add slight wobble for realism
+        const wobble = 1 + Math.sin(i * 0.5) * 0.02;
+        const x = px + Math.cos(a) * outerRange * wobble;
+        const y = py + Math.sin(a) * outerRange * wobble;
+        graphics.lineTo(x, y);
+      }
       graphics.closePath();
       graphics.fillPath();
 
       // Ambient light around player (larger when flashlight on)
-      graphics.fillCircle(px, py, 50);
+      graphics.fillCircle(px, py, 60);
     } else {
       // Very small ambient light when flashlight off
-      graphics.fillCircle(px, py, 25);
+      graphics.fillCircle(px, py, 20);
     }
 
     graphics.blendMode = Phaser.BlendModes.NORMAL;
@@ -1257,6 +1330,9 @@ class GameScene extends Phaser.Scene {
     itemSprite.itemData = { type: item.type, id: itemId, name: item.name };
     this.physics.add.existing(itemSprite, false);
     itemSprite.body.setImmovable(true);
+    // Larger pickup hitbox
+    itemSprite.body.setSize(60, 60);
+    itemSprite.body.setOffset(-20, -20);
     this.items.add(itemSprite);
 
     // Item glow animation
