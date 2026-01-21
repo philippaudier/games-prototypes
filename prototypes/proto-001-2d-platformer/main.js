@@ -298,29 +298,68 @@ class GameScene extends Phaser.Scene {
 
     // Texte du niveau
     const levelText = isBossLevel
-      ? `BOSS`
+      ? `⚠ DANGER ⚠`
       : `NIVEAU ${this.currentLevel}`;
 
     this.introText = this.add.text(centerX, centerY, levelText, {
-      fontSize: isBossLevel ? '64px' : '48px',
+      fontSize: isBossLevel ? '56px' : '48px',
       fontFamily: 'Arial Black, sans-serif',
       fill: isBossLevel ? '#ff4444' : '#ffffff',
       stroke: isBossLevel ? '#880000' : '#333333',
       strokeThickness: isBossLevel ? 8 : 4
     }).setOrigin(0.5).setDepth(1001).setScrollFactor(0).setAlpha(0).setScale(0.5);
 
-    // Sous-titre pour les boss
+    // Pour les boss: effet de warning clignotant au lieu du nom
     if (isBossLevel) {
-      const bossNum = Math.floor(this.currentLevel / 5);
-      const bossType = ((bossNum - 1) % 5) + 1;
-      const bossNames = ['', 'CHARGER', 'SPINNER', 'SPLITTER', 'GUARDIAN', 'SUMMONER'];
-      this.introSubtext = this.add.text(centerX, centerY + 50, bossNames[bossType], {
-        fontSize: '28px',
-        fontFamily: 'Arial, sans-serif',
-        fill: '#ffaaaa',
+      // Créer une tête de mort en pixel art avec des rectangles
+      this.bossSkullContainer = this.add.container(centerX, centerY + 55).setDepth(1001).setScrollFactor(0).setAlpha(0);
+
+      // Crâne simplifié (16x16 pixels, scale x3)
+      const px = 3; // Taille d'un "pixel"
+      const skullColor = 0xffffff;
+      const eyeColor = 0xff0000;
+
+      // Forme du crâne
+      const skull = [
+        // Rangée 1-2: haut du crâne
+        this.add.rectangle(-2*px, -6*px, 4*px, 2*px, skullColor),
+        // Rangée 3-4: côtés + haut
+        this.add.rectangle(-3*px, -4*px, 6*px, 2*px, skullColor),
+        // Rangée 5-6: yeux
+        this.add.rectangle(-3*px, -2*px, 6*px, 2*px, skullColor),
+        this.add.rectangle(-2*px, -2*px, px, 2*px, eyeColor), // Œil gauche
+        this.add.rectangle(1*px, -2*px, px, 2*px, eyeColor),  // Œil droit
+        // Rangée 7-8: nez + joues
+        this.add.rectangle(-3*px, 0, 6*px, 2*px, skullColor),
+        this.add.rectangle(0, 0, px, px, 0x000000), // Nez
+        // Rangée 9-10: mâchoire
+        this.add.rectangle(-2*px, 2*px, 4*px, 2*px, skullColor),
+        // Dents
+        this.add.rectangle(-1.5*px, 2*px, px*0.5, px, 0x000000),
+        this.add.rectangle(0, 2*px, px*0.5, px, 0x000000),
+        this.add.rectangle(1.5*px, 2*px, px*0.5, px, 0x000000),
+      ];
+      skull.forEach(part => this.bossSkullContainer.add(part));
+
+      // Texte "BOSS FIGHT" en dessous
+      const fightText = this.add.text(0, 25, 'BOSS FIGHT', {
+        fontSize: '18px',
+        fontFamily: 'Arial Black, sans-serif',
+        fill: '#ff6666',
         stroke: '#440000',
-        strokeThickness: 3
-      }).setOrigin(0.5).setDepth(1001).setScrollFactor(0).setAlpha(0);
+        strokeThickness: 2
+      }).setOrigin(0.5);
+      this.bossSkullContainer.add(fightText);
+
+      // Animation de clignotement pour l'effet danger
+      this.tweens.add({
+        targets: this.introText,
+        alpha: { from: 1, to: 0.5 },
+        duration: 200,
+        yoyo: true,
+        repeat: -1,
+        delay: 400
+      });
     }
 
     // Animation d'entrée du texte
@@ -338,15 +377,15 @@ class GameScene extends Phaser.Scene {
       }
     });
 
-    // Animation du sous-texte boss
-    if (this.introSubtext) {
+    // Animation du skull pour les boss
+    if (this.bossSkullContainer) {
       this.tweens.add({
-        targets: this.introSubtext,
+        targets: this.bossSkullContainer,
         alpha: 1,
-        y: centerY + 45,
-        duration: 500,
-        delay: 200,
-        ease: 'Power2'
+        scale: { from: 0.5, to: 1 },
+        duration: 400,
+        delay: 250,
+        ease: 'Back.easeOut'
       });
     }
   }
@@ -354,9 +393,9 @@ class GameScene extends Phaser.Scene {
   startLevelFadeIn() {
     const isBossLevel = this.currentLevel % 5 === 0;
 
-    // Fade out du texte
+    // Fade out du texte et skull
     this.tweens.add({
-      targets: [this.introText, this.introSubtext].filter(Boolean),
+      targets: [this.introText, this.bossSkullContainer].filter(Boolean),
       alpha: 0,
       scale: 1.2,
       duration: 300,
@@ -373,7 +412,7 @@ class GameScene extends Phaser.Scene {
         // Nettoyer
         if (this.transitionOverlay) this.transitionOverlay.destroy();
         if (this.introText) this.introText.destroy();
-        if (this.introSubtext) this.introSubtext.destroy();
+        if (this.bossSkullContainer) this.bossSkullContainer.destroy();
 
         // Activer le joueur
         this.canMove = true;
@@ -3925,15 +3964,22 @@ class GameScene extends Phaser.Scene {
 
   spawnBoss() {
     const bossNum = Math.floor(this.currentLevel / 5);
-    const bossType = ((bossNum - 1) % 5) + 1; // Cycle 1-5
+    const bossType = ((bossNum - 1) % 10) + 1; // Cycle 1-10 (10 boss uniques)
 
     // Config de base selon le type (tailles réduites pour arène 960x540)
     const bossConfigs = {
+      // === CYCLE 1 : Boss classiques ===
       1: { name: 'CHARGER', color: 0xaa00aa, stroke: 0xff00ff, health: 5, size: 35 },
       2: { name: 'SPINNER', color: 0x00aaaa, stroke: 0x00ffff, health: 6, size: 32 },
       3: { name: 'SPLITTER', color: 0xaaaa00, stroke: 0xffff00, health: 4, size: 40 },
       4: { name: 'GUARDIAN', color: 0x0066aa, stroke: 0x0099ff, health: 8, size: 38 },
-      5: { name: 'SUMMONER', color: 0xaa0066, stroke: 0xff0099, health: 6, size: 30 }
+      5: { name: 'SUMMONER', color: 0xaa0066, stroke: 0xff0099, health: 6, size: 30 },
+      // === CYCLE 2 : Boss avancés ===
+      6: { name: 'CRUSHER', color: 0x884400, stroke: 0xcc6600, health: 7, size: 50 },    // Gros, slams
+      7: { name: 'PHANTOM', color: 0x6600aa, stroke: 0x9933ff, health: 5, size: 28 },   // Petit, clones
+      8: { name: 'BERSERKER', color: 0xcc0000, stroke: 0xff3333, health: 10, size: 42 }, // Rage mode
+      9: { name: 'ARCHITECT', color: 0x00aa44, stroke: 0x00ff66, health: 6, size: 34 }, // Construit
+      10: { name: 'TWINS', color: 0xff6600, stroke: 0xffaa00, health: 4, size: 30 }     // Duo (x2)
     };
 
     const config = bossConfigs[bossType];
@@ -4013,6 +4059,119 @@ class GameScene extends Phaser.Scene {
     this.bossPhase = 1;
     this.boss.moveSpeed = 80 + bossNum * 15;
     this.bossColor = config.color;
+
+    // === PROPRIÉTÉS PHYSIQUES RÉALISTES ===
+    // Chaque boss a des caractéristiques de mouvement uniques
+    const physicsProfiles = {
+      1: { // CHARGER - Lourd, avec momentum
+        mass: 1.5,
+        acceleration: 400,
+        maxSpeed: 200,
+        drag: 0.92,
+        floatAmplitude: 3,
+        floatSpeed: 0.002,
+        lungeForce: 600,
+        weight: 'heavy'
+      },
+      2: { // SPINNER - Léger, flottant
+        mass: 0.6,
+        acceleration: 300,
+        maxSpeed: 150,
+        drag: 0.96,
+        floatAmplitude: 8,
+        floatSpeed: 0.004,
+        driftForce: 100,
+        weight: 'light'
+      },
+      3: { // SPLITTER - Rebondissant, élastique
+        mass: 0.8,
+        acceleration: 350,
+        maxSpeed: 180,
+        drag: 0.88,
+        floatAmplitude: 5,
+        floatSpeed: 0.003,
+        bounceForce: 200,
+        weight: 'bouncy'
+      },
+      4: { // GUARDIAN - Massif, lent mais implacable
+        mass: 2.5,
+        acceleration: 200,
+        maxSpeed: 120,
+        drag: 0.85,
+        floatAmplitude: 2,
+        floatSpeed: 0.001,
+        impactForce: 400,
+        weight: 'massive'
+      },
+      5: { // SUMMONER - Mystique, dérive fluide
+        mass: 0.5,
+        acceleration: 250,
+        maxSpeed: 140,
+        drag: 0.97,
+        floatAmplitude: 12,
+        floatSpeed: 0.003,
+        warpDrift: 80,
+        weight: 'ethereal'
+      },
+      // === CYCLE 2 : Boss avancés ===
+      6: { // CRUSHER - Ultra lourd, slams dévastateurs
+        mass: 4.0,
+        acceleration: 500,
+        maxSpeed: 100,
+        drag: 0.75,
+        floatAmplitude: 1,
+        floatSpeed: 0.001,
+        slamForce: 800,
+        weight: 'crushing'
+      },
+      7: { // PHANTOM - Spectral, mouvement imprévisible
+        mass: 0.3,
+        acceleration: 400,
+        maxSpeed: 250,
+        drag: 0.98,
+        floatAmplitude: 15,
+        floatSpeed: 0.006,
+        phaseShift: 150,
+        weight: 'spectral'
+      },
+      8: { // BERSERKER - Devient plus rapide avec la rage
+        mass: 1.2,
+        acceleration: 350,
+        maxSpeed: 180,
+        drag: 0.90,
+        floatAmplitude: 4,
+        floatSpeed: 0.002,
+        rageMultiplier: 1.5,
+        weight: 'raging'
+      },
+      9: { // ARCHITECT - Précis, méthodique
+        mass: 1.0,
+        acceleration: 280,
+        maxSpeed: 160,
+        drag: 0.93,
+        floatAmplitude: 3,
+        floatSpeed: 0.002,
+        buildForce: 100,
+        weight: 'calculated'
+      },
+      10: { // TWINS - Synchronisés, agiles
+        mass: 0.7,
+        acceleration: 320,
+        maxSpeed: 200,
+        drag: 0.91,
+        floatAmplitude: 6,
+        floatSpeed: 0.004,
+        syncForce: 120,
+        weight: 'synchronized'
+      }
+    };
+
+    const physics = physicsProfiles[bossType] || physicsProfiles[1];
+    this.boss.physics = physics;
+    this.boss.targetVelX = 0;
+    this.boss.targetVelY = 0;
+    this.boss.floatOffset = Math.random() * Math.PI * 2; // Désynchroniser le flottement
+    this.boss.baseY = bossY; // Position Y de base pour le flottement
 
     // Créer l'UI du boss
     this.createBossUI(config.name, bossNum, config.stroke);
@@ -4117,6 +4276,11 @@ class GameScene extends Phaser.Scene {
         case 3: this.initBossSplitter(); break;
         case 4: this.initBossGuardian(); break;
         case 5: this.initBossSummoner(); break;
+        case 6: this.initBossCrusher(); break;
+        case 7: this.initBossPhantom(); break;
+        case 8: this.initBossBerserker(); break;
+        case 9: this.initBossArchitect(); break;
+        case 10: this.initBossTwins(); break;
       }
     });
   }
@@ -4294,6 +4458,180 @@ class GameScene extends Phaser.Scene {
           container.bossBody = robe;
         }
         break;
+
+      case 6: // CRUSHER - Masse colossale
+        {
+          // Corps principal massif (bloc lourd)
+          const body = this.add.rectangle(0, 0, s*1.2, s*0.9, config.color);
+          body.setStrokeStyle(5, config.stroke);
+
+          // Plaques de métal/roche
+          const plateTop = this.add.rectangle(0, -s*0.35, s*0.9, s*0.15, 0x553311);
+          plateTop.setStrokeStyle(2, 0x886633);
+          const plateBot = this.add.rectangle(0, s*0.35, s*0.9, s*0.15, 0x553311);
+          plateBot.setStrokeStyle(2, 0x886633);
+
+          // Fissures/détails
+          const crack1 = this.add.line(0, 0, -s*0.3, -s*0.2, s*0.1, s*0.15, 0x221100);
+          crack1.setLineWidth(3);
+          const crack2 = this.add.line(0, 0, s*0.2, -s*0.1, s*0.4, s*0.2, 0x221100);
+          crack2.setLineWidth(2);
+
+          // Yeux menaçants profonds
+          const eyeL = this.add.circle(-s*0.25, -s*0.1, 10, 0x000000);
+          const pupilL = this.add.circle(-s*0.25, -s*0.1, 6, 0xff3300);
+          const eyeR = this.add.circle(s*0.25, -s*0.1, 10, 0x000000);
+          const pupilR = this.add.circle(s*0.25, -s*0.1, 6, 0xff3300);
+
+          // Poids/chaînes
+          const chain1 = this.add.rectangle(-s*0.5, s*0.45, 8, 20, 0x444444);
+          const chain2 = this.add.rectangle(s*0.5, s*0.45, 8, 20, 0x444444);
+
+          container.add([body, plateTop, plateBot, crack1, crack2, eyeL, pupilL, eyeR, pupilR, chain1, chain2]);
+          container.bossBody = body;
+        }
+        break;
+
+      case 7: // PHANTOM - Entité spectrale
+        {
+          // Corps translucide principal
+          const ghostBody = this.add.ellipse(0, 0, s*0.8, s*1.0, config.color, 0.6);
+          ghostBody.setStrokeStyle(3, config.stroke);
+
+          // Queue spectrale
+          const tail = this.add.triangle(0, s*0.4, -s*0.25, 0, s*0.25, 0, 0, s*0.5, config.color, 0.4);
+
+          // Capuche/tête
+          const hood = this.add.ellipse(0, -s*0.2, s*0.6, s*0.5, 0x330066, 0.8);
+          hood.setStrokeStyle(2, config.stroke);
+
+          // Yeux fantomatiques (vides mais lumineux)
+          const eyeL = this.add.ellipse(-s*0.12, -s*0.2, 12, 16, 0x000000);
+          const glowL = this.add.ellipse(-s*0.12, -s*0.22, 6, 8, 0xcc66ff);
+          const eyeR = this.add.ellipse(s*0.12, -s*0.2, 12, 16, 0x000000);
+          const glowR = this.add.ellipse(s*0.12, -s*0.22, 6, 8, 0xcc66ff);
+
+          // Mains spectrales
+          const handL = this.add.ellipse(-s*0.4, s*0.1, 15, 20, config.color, 0.5);
+          const handR = this.add.ellipse(s*0.4, s*0.1, 15, 20, config.color, 0.5);
+
+          container.add([tail, ghostBody, hood, eyeL, glowL, eyeR, glowR, handL, handR]);
+          container.ghostBody = ghostBody;
+          container.bossBody = ghostBody;
+        }
+        break;
+
+      case 8: // BERSERKER - Guerrier enragé
+        {
+          // Corps musclé (trapèze inversé)
+          const torso = this.add.polygon(0, 0, [
+            -s*0.4, -s*0.35, s*0.4, -s*0.35,
+            s*0.5, s*0.3, -s*0.5, s*0.3
+          ], config.color);
+          torso.setStrokeStyle(4, config.stroke);
+
+          // Tête avec casque
+          const head = this.add.circle(0, -s*0.45, s*0.22, 0x660000);
+          head.setStrokeStyle(3, 0xaa0000);
+
+          // Cornes du casque
+          const hornL = this.add.triangle(-s*0.2, -s*0.55, 0, 0, -10, -30, 8, -25, 0xaa0000);
+          const hornR = this.add.triangle(s*0.2, -s*0.55, 0, 0, 10, -30, -8, -25, 0xaa0000);
+
+          // Yeux de rage (rouges brillants)
+          const eyeL = this.add.circle(-s*0.1, -s*0.45, 7, 0xff0000);
+          const eyeR = this.add.circle(s*0.1, -s*0.45, 7, 0xff0000);
+
+          // Bras musclés
+          const armL = this.add.rectangle(-s*0.55, 0, 15, s*0.5, config.color);
+          armL.setStrokeStyle(2, config.stroke);
+          const armR = this.add.rectangle(s*0.55, 0, 15, s*0.5, config.color);
+          armR.setStrokeStyle(2, config.stroke);
+
+          // Arme (masse/hache)
+          const weapon = this.add.rectangle(s*0.7, -s*0.1, 12, s*0.6, 0x444444);
+          const blade = this.add.triangle(s*0.85, -s*0.3, 0, 0, 25, 15, 25, -15, 0x888888);
+
+          // Aura de rage
+          container.rageGlow = this.add.circle(0, 0, s*0.6, 0xff0000, 0.1);
+
+          container.add([container.rageGlow, torso, head, hornL, hornR, eyeL, eyeR, armL, armR, weapon, blade]);
+          container.eyes = [eyeL, eyeR];
+          container.bossBody = torso;
+        }
+        break;
+
+      case 9: // ARCHITECT - Constructeur mécanique
+        {
+          // Corps géométrique parfait (octogone)
+          const body = this.add.polygon(0, 0, [
+            -s*0.2, -s*0.45, s*0.2, -s*0.45,
+            s*0.45, -s*0.2, s*0.45, s*0.2,
+            s*0.2, s*0.45, -s*0.2, s*0.45,
+            -s*0.45, s*0.2, -s*0.45, -s*0.2
+          ], config.color);
+          body.setStrokeStyle(3, config.stroke);
+
+          // Grille de construction interne
+          const gridH1 = this.add.line(0, 0, -s*0.3, 0, s*0.3, 0, 0x006622);
+          gridH1.setLineWidth(2);
+          const gridV1 = this.add.line(0, 0, 0, -s*0.3, 0, s*0.3, 0x006622);
+          gridV1.setLineWidth(2);
+
+          // Œil central (scanner)
+          const scanner = this.add.circle(0, 0, s*0.12, 0x00ff44);
+          scanner.setStrokeStyle(3, 0xffffff);
+          const scanLine = this.add.rectangle(0, 0, s*0.2, 3, 0x00ff00);
+
+          // Bras mécaniques (rétractés)
+          const arm1 = this.add.rectangle(-s*0.5, 0, s*0.2, 8, 0x336633);
+          arm1.setStrokeStyle(2, config.stroke);
+          const arm2 = this.add.rectangle(s*0.5, 0, s*0.2, 8, 0x336633);
+          arm2.setStrokeStyle(2, config.stroke);
+          const arm3 = this.add.rectangle(0, -s*0.5, 8, s*0.2, 0x336633);
+          arm3.setStrokeStyle(2, config.stroke);
+          const arm4 = this.add.rectangle(0, s*0.5, 8, s*0.2, 0x336633);
+          arm4.setStrokeStyle(2, config.stroke);
+
+          container.add([body, gridH1, gridV1, scanner, scanLine, arm1, arm2, arm3, arm4]);
+          container.scanner = scanner;
+          container.scanLine = scanLine;
+          container.arms = [arm1, arm2, arm3, arm4];
+          container.bossBody = body;
+        }
+        break;
+
+      case 10: // TWINS - Deux entités liées
+        {
+          // Premier jumeau (gauche, agressif)
+          const twin1 = this.add.circle(-s*0.4, 0, s*0.35, config.color);
+          twin1.setStrokeStyle(3, config.stroke);
+          const eye1L = this.add.circle(-s*0.5, -s*0.05, 5, 0xff0000);
+          const eye1R = this.add.circle(-s*0.3, -s*0.05, 5, 0xff0000);
+          const mouth1 = this.add.arc(-s*0.4, s*0.1, 8, 0, 180, false, 0x660000);
+
+          // Deuxième jumeau (droite, défensif)
+          const twin2 = this.add.circle(s*0.4, 0, s*0.35, 0xff9900);
+          twin2.setStrokeStyle(3, 0xffcc00);
+          const eye2L = this.add.circle(s*0.3, -s*0.05, 5, 0x0066ff);
+          const eye2R = this.add.circle(s*0.5, -s*0.05, 5, 0x0066ff);
+          const mouth2 = this.add.arc(s*0.4, s*0.1, 8, 180, 360, false, 0x003366);
+
+          // Lien entre les jumeaux (chaîne d'énergie)
+          const link = this.add.rectangle(0, 0, s*0.3, 6, 0xffff00, 0.7);
+          link.setStrokeStyle(2, 0xffffff);
+
+          // Particules du lien
+          const linkGlow = this.add.circle(0, 0, 10, 0xffff00, 0.5);
+
+          container.add([link, linkGlow, twin1, eye1L, eye1R, mouth1, twin2, eye2L, eye2R, mouth2]);
+          container.twin1 = twin1;
+          container.twin2 = twin2;
+          container.link = link;
+          container.linkGlow = linkGlow;
+          container.bossBody = twin1; // Primary target
+        }
+        break;
     }
 
     container.setDepth(30);
@@ -4394,6 +4732,123 @@ class GameScene extends Phaser.Scene {
               life: 600, fadeOut: true
             });
           }
+          break;
+
+        case 6: // CRUSHER - Poussière et débris lourds
+          // Particules de débris tombant
+          if (Math.random() < 0.5) {
+            this.emitParticles(x + (Math.random() - 0.5) * size, y + size * 0.3, {
+              count: 2, colors: [0x884422, 0x553311, 0x665533],
+              minSpeed: 30, maxSpeed: 80, minSize: 4, maxSize: 10,
+              life: 500, angle: Math.PI/2, spread: Math.PI/4,
+              gravity: 200, fadeOut: true
+            });
+          }
+          // Aura de poids écrasant
+          for (let i = 0; i < 2; i++) {
+            const angle = Date.now() * 0.001 + (i / 2) * Math.PI;
+            this.emitParticles(x + Math.cos(angle) * size * 0.5, y + Math.sin(angle) * size * 0.3, {
+              count: 1, colors: [0xcc6600, 0x884400],
+              minSpeed: 5, maxSpeed: 15, minSize: 3, maxSize: 6,
+              life: 400, fadeOut: true
+            });
+          }
+          break;
+
+        case 7: // PHANTOM - Traînées spectrales et brume
+          // Traînée fantomatique
+          for (let i = 0; i < 3; i++) {
+            const ghostAngle = Date.now() * 0.004 + (i / 3) * Math.PI * 2;
+            const dist = size * 0.5 + Math.sin(Date.now() * 0.008 + i * 2) * 15;
+            this.emitParticles(x + Math.cos(ghostAngle) * dist, y + Math.sin(ghostAngle) * dist, {
+              count: 1, colors: [0x9933ff, 0x6600aa, 0xcc66ff, 0xffffff],
+              minSpeed: 5, maxSpeed: 20, minSize: 2, maxSize: 6,
+              life: 700, fadeOut: true
+            });
+          }
+          // Effet de phase (apparition/disparition)
+          if (Math.random() < 0.2) {
+            this.emitParticles(x, y, {
+              count: 5, colors: [0xcc66ff, 0x9933ff],
+              minSpeed: 50, maxSpeed: 100, minSize: 2, maxSize: 4,
+              life: 300, spread: Math.PI * 2, fadeOut: true
+            });
+          }
+          break;
+
+        case 8: // BERSERKER - Aura de rage enflammée
+          // Flammes de rage autour
+          for (let i = 0; i < 4; i++) {
+            const flameAngle = Date.now() * 0.005 + (i / 4) * Math.PI * 2;
+            const dist = size * 0.6;
+            this.emitParticles(x + Math.cos(flameAngle) * dist, y + Math.sin(flameAngle) * dist, {
+              count: 1, colors: [0xff0000, 0xff3300, 0xff6600, 0xffaa00],
+              minSpeed: 30, maxSpeed: 80, minSize: 3, maxSize: 8,
+              life: 350, angle: -Math.PI/2, spread: Math.PI/3,
+              gravity: -100, fadeOut: true
+            });
+          }
+          // Étincelles de fureur
+          if (Math.random() < 0.3) {
+            this.emitParticles(x + (Math.random() - 0.5) * size * 0.8, y + (Math.random() - 0.5) * size * 0.8, {
+              count: 3, colors: [0xffff00, 0xffffff],
+              minSpeed: 80, maxSpeed: 150, minSize: 1, maxSize: 3,
+              life: 200, spread: Math.PI * 2
+            });
+          }
+          break;
+
+        case 9: // ARCHITECT - Grille holographique et données
+          // Particules de données/code
+          for (let i = 0; i < 4; i++) {
+            const dataAngle = (i / 4) * Math.PI * 2;
+            const dist = size * 0.6;
+            this.emitParticles(x + Math.cos(dataAngle) * dist, y + Math.sin(dataAngle) * dist, {
+              count: 1, colors: [0x00ff44, 0x00aa33, 0x00ff00],
+              minSpeed: 10, maxSpeed: 30, minSize: 2, maxSize: 4,
+              life: 500, fadeOut: true, shape: 'square'
+            });
+          }
+          // Scan laser
+          if (Math.random() < 0.15) {
+            const scanY = y + (Math.random() - 0.5) * size;
+            this.emitParticles(x, scanY, {
+              count: 8, colors: [0x00ff00, 0xffffff],
+              minSpeed: 100, maxSpeed: 200, minSize: 1, maxSize: 2,
+              life: 200, angle: 0, spread: 0.2
+            });
+            this.emitParticles(x, scanY, {
+              count: 8, colors: [0x00ff00, 0xffffff],
+              minSpeed: 100, maxSpeed: 200, minSize: 1, maxSize: 2,
+              life: 200, angle: Math.PI, spread: 0.2
+            });
+          }
+          break;
+
+        case 10: // TWINS - Énergie synchronisée entre jumeaux
+          // Particules sur le lien
+          for (let i = 0; i < 3; i++) {
+            const linkX = x + (Math.random() - 0.5) * size * 0.3;
+            this.emitParticles(linkX, y, {
+              count: 1, colors: [0xffff00, 0xffaa00, 0xffffff],
+              minSpeed: 20, maxSpeed: 50, minSize: 2, maxSize: 5,
+              life: 400, fadeOut: true
+            });
+          }
+          // Aura twin 1 (orange)
+          const t1Angle = Date.now() * 0.004;
+          this.emitParticles(x - size * 0.4 + Math.cos(t1Angle) * 15, y + Math.sin(t1Angle) * 15, {
+            count: 1, colors: [0xff6600, 0xffaa00],
+            minSpeed: 10, maxSpeed: 25, minSize: 2, maxSize: 4,
+            life: 350, fadeOut: true
+          });
+          // Aura twin 2 (bleu)
+          const t2Angle = Date.now() * 0.004 + Math.PI;
+          this.emitParticles(x + size * 0.4 + Math.cos(t2Angle) * 15, y + Math.sin(t2Angle) * 15, {
+            count: 1, colors: [0x0066ff, 0x00aaff],
+            minSpeed: 10, maxSpeed: 25, minSize: 2, maxSize: 4,
+            life: 350, fadeOut: true
+          });
           break;
       }
     };
@@ -4497,6 +4952,251 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  // === MISE À JOUR PHYSIQUE DU BOSS (appelée chaque frame) ===
+  updateBossPhysics(delta) {
+    if (!this.boss || !this.boss.active || !this.boss.physics) return;
+    if (this.bossIntroPlaying) return; // Pas de mouvement pendant l'intro
+
+    const phys = this.boss.physics;
+    const body = this.boss.body;
+    const time = this.time.now;
+
+    // === FLOTTEMENT NATUREL ===
+    // Tous les boss flottent légèrement pour un effet vivant
+    const floatY = Math.sin(time * phys.floatSpeed + this.boss.floatOffset) * phys.floatAmplitude;
+    const floatX = Math.cos(time * phys.floatSpeed * 0.7 + this.boss.floatOffset) * (phys.floatAmplitude * 0.3);
+
+    // === ACCÉLÉRATION PROGRESSIVE ===
+    // Au lieu de set velocity directement, on accélère vers la target velocity
+    const currentVelX = body.velocity.x;
+    const currentVelY = body.velocity.y;
+
+    // Calculer l'accélération nécessaire
+    const deltaTime = delta / 1000; // Convertir en secondes
+    const accelRate = phys.acceleration * deltaTime;
+
+    // Appliquer l'accélération avec inertie (différent selon le poids)
+    let newVelX, newVelY;
+
+    if (phys.weight === 'heavy') {
+      // Mouvement lourd: accélération lente, décélération lente
+      const diffX = this.boss.targetVelX - currentVelX;
+      const diffY = this.boss.targetVelY - currentVelY;
+      newVelX = currentVelX + diffX * 0.03;
+      newVelY = currentVelY + diffY * 0.03;
+    } else if (phys.weight === 'light') {
+      // Mouvement léger: très réactif mais avec dérive
+      const diffX = this.boss.targetVelX - currentVelX;
+      const diffY = this.boss.targetVelY - currentVelY;
+      newVelX = currentVelX + diffX * 0.08;
+      newVelY = currentVelY + diffY * 0.08;
+      // Ajout de dérive aléatoire
+      newVelX += Math.sin(time * 0.003) * phys.driftForce * deltaTime;
+      newVelY += Math.cos(time * 0.004) * phys.driftForce * 0.5 * deltaTime;
+    } else if (phys.weight === 'bouncy') {
+      // Mouvement élastique: rebondit, overshoot
+      const diffX = this.boss.targetVelX - currentVelX;
+      const diffY = this.boss.targetVelY - currentVelY;
+      // Effet ressort
+      const springFactor = 0.06;
+      newVelX = currentVelX + diffX * springFactor;
+      newVelY = currentVelY + diffY * springFactor;
+      // Légère oscillation
+      if (Math.abs(diffX) < 10) newVelX += Math.sin(time * 0.01) * 20;
+    } else if (phys.weight === 'massive') {
+      // Mouvement massif: très lent à démarrer et à s'arrêter
+      const diffX = this.boss.targetVelX - currentVelX;
+      const diffY = this.boss.targetVelY - currentVelY;
+      newVelX = currentVelX + diffX * 0.015;
+      newVelY = currentVelY + diffY * 0.015;
+      // Tremblement de poids
+      if (Math.abs(currentVelX) > 50 || Math.abs(currentVelY) > 50) {
+        this.boss.setScale(1 + Math.sin(time * 0.02) * 0.02, 1 - Math.sin(time * 0.02) * 0.02);
+      } else {
+        this.boss.setScale(1, 1);
+      }
+    } else if (phys.weight === 'ethereal') {
+      // Mouvement éthéré: flotte, dérive mystérieuse
+      const diffX = this.boss.targetVelX - currentVelX;
+      const diffY = this.boss.targetVelY - currentVelY;
+      newVelX = currentVelX + diffX * 0.05;
+      newVelY = currentVelY + diffY * 0.05;
+      // Dérive en spirale
+      const spiralAngle = time * 0.002;
+      newVelX += Math.cos(spiralAngle) * phys.warpDrift * deltaTime;
+      newVelY += Math.sin(spiralAngle) * phys.warpDrift * 0.5 * deltaTime;
+    } else if (phys.weight === 'crushing') {
+      // CRUSHER: Ultra lourd, énorme inertie, slams dévastateurs
+      const diffX = this.boss.targetVelX - currentVelX;
+      const diffY = this.boss.targetVelY - currentVelY;
+      // Accélération très lente
+      newVelX = currentVelX + diffX * 0.01;
+      newVelY = currentVelY + diffY * 0.01;
+      // Tremblement constant de poids
+      const shakeIntensity = Math.min(speed / 100, 0.03);
+      this.boss.setScale(1 + Math.sin(time * 0.03) * shakeIntensity, 1 - Math.sin(time * 0.03) * shakeIntensity);
+      // Effet de poussière quand il bouge
+      if (speed > 30 && Math.random() < 0.1) {
+        this.emitParticles(this.boss.x, this.boss.y + 30, {
+          count: 2, colors: [0x884422, 0x553311],
+          minSpeed: 20, maxSpeed: 50, minSize: 3, maxSize: 6,
+          life: 400, angle: Math.PI/2, spread: Math.PI/3, fadeOut: true
+        });
+      }
+    } else if (phys.weight === 'spectral') {
+      // PHANTOM: Phase through reality, imprévisible
+      const diffX = this.boss.targetVelX - currentVelX;
+      const diffY = this.boss.targetVelY - currentVelY;
+      // Mouvement fluide mais avec "sauts" spectraux
+      newVelX = currentVelX + diffX * 0.06;
+      newVelY = currentVelY + diffY * 0.06;
+      // Téléportation visuelle micro (shimmer)
+      const phaseOffset = Math.sin(time * 0.01) * phys.phaseShift * 0.01;
+      newVelX += phaseOffset;
+      // Alpha fluctuant
+      if (this.boss.alpha !== undefined) {
+        this.boss.setAlpha(0.6 + Math.sin(time * 0.005) * 0.3);
+      }
+    } else if (phys.weight === 'raging') {
+      // BERSERKER: Plus rapide quand blessé, momentum rage
+      const diffX = this.boss.targetVelX - currentVelX;
+      const diffY = this.boss.targetVelY - currentVelY;
+      // Facteur de rage basé sur la santé perdue
+      const healthPercent = this.bossHealth / this.bossMaxHealth;
+      const rageFactor = 1 + (1 - healthPercent) * (phys.rageMultiplier - 1);
+      newVelX = currentVelX + diffX * 0.045 * rageFactor;
+      newVelY = currentVelY + diffY * 0.045 * rageFactor;
+      // Effets visuels de rage (tremblement, rougeur)
+      if (rageFactor > 1.2) {
+        const rageShake = (rageFactor - 1) * 0.05;
+        this.boss.x += (Math.random() - 0.5) * rageShake * 5;
+      }
+    } else if (phys.weight === 'calculated') {
+      // ARCHITECT: Précis, pas de dérive, mouvement méthodique
+      const diffX = this.boss.targetVelX - currentVelX;
+      const diffY = this.boss.targetVelY - currentVelY;
+      // Mouvement par paliers (pas fluide, mais précis)
+      const stepFactor = 0.04;
+      if (Math.abs(diffX) > 5) newVelX = currentVelX + Math.sign(diffX) * Math.min(Math.abs(diffX) * stepFactor, 10);
+      else newVelX = this.boss.targetVelX;
+      if (Math.abs(diffY) > 5) newVelY = currentVelY + Math.sign(diffY) * Math.min(Math.abs(diffY) * stepFactor, 10);
+      else newVelY = this.boss.targetVelY;
+    } else if (phys.weight === 'synchronized') {
+      // TWINS: Mouvement synchronisé, rebond entre jumeaux
+      const diffX = this.boss.targetVelX - currentVelX;
+      const diffY = this.boss.targetVelY - currentVelY;
+      // Mouvement agile avec oscillation synchronisée
+      newVelX = currentVelX + diffX * 0.055;
+      newVelY = currentVelY + diffY * 0.055;
+      // Oscillation perpendiculaire au mouvement
+      const perpAngle = Math.atan2(newVelY, newVelX) + Math.PI/2;
+      const syncOscillation = Math.sin(time * 0.008) * phys.syncForce * 0.3 * deltaTime;
+      newVelX += Math.cos(perpAngle) * syncOscillation;
+      newVelY += Math.sin(perpAngle) * syncOscillation;
+    } else {
+      // Défaut: mouvement standard
+      const diffX = this.boss.targetVelX - currentVelX;
+      const diffY = this.boss.targetVelY - currentVelY;
+      newVelX = currentVelX + diffX * 0.05;
+      newVelY = currentVelY + diffY * 0.05;
+    }
+
+    // Appliquer le drag (friction de l'air)
+    newVelX *= phys.drag;
+    newVelY *= phys.drag;
+
+    // Limiter à la vitesse max
+    const speed = Math.sqrt(newVelX * newVelX + newVelY * newVelY);
+    if (speed > phys.maxSpeed) {
+      const scale = phys.maxSpeed / speed;
+      newVelX *= scale;
+      newVelY *= scale;
+    }
+
+    // Ajouter le flottement à la vélocité
+    body.setVelocity(newVelX + floatX * 10, newVelY + floatY * 10);
+
+    // === LIMITES DE LA ZONE ===
+    const minX = 100;
+    const maxX = this.WORLD.width - 100;
+    const minY = 100;
+    const maxY = this.WORLD.groundY - 80;
+
+    // Rebond doux sur les bords (pas instant)
+    if (this.boss.x < minX) {
+      this.boss.targetVelX = Math.abs(this.boss.targetVelX) + 50;
+      if (phys.weight === 'bouncy') body.velocity.x *= -0.8;
+    }
+    if (this.boss.x > maxX) {
+      this.boss.targetVelX = -Math.abs(this.boss.targetVelX) - 50;
+      if (phys.weight === 'bouncy') body.velocity.x *= -0.8;
+    }
+    if (this.boss.y < minY) {
+      this.boss.targetVelY = Math.abs(this.boss.targetVelY) + 30;
+      if (phys.weight === 'bouncy') body.velocity.y *= -0.8;
+    }
+    if (this.boss.y > maxY) {
+      this.boss.targetVelY = -Math.abs(this.boss.targetVelY) - 30;
+      if (phys.weight === 'bouncy') body.velocity.y *= -0.8;
+    }
+
+    // === EFFETS VISUELS SELON LE POIDS ===
+    // Squash & Stretch subtil basé sur la vélocité
+    if (phys.weight !== 'massive') {
+      const velMagnitude = Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2);
+      const stretchFactor = Math.min(velMagnitude / 300, 0.15);
+      const moveAngle = Math.atan2(body.velocity.y, body.velocity.x);
+
+      // Appliquer stretch dans la direction du mouvement
+      const scaleX = 1 + Math.abs(Math.cos(moveAngle)) * stretchFactor;
+      const scaleY = 1 + Math.abs(Math.sin(moveAngle)) * stretchFactor;
+      this.boss.setScale(scaleX, scaleY);
+    }
+  }
+
+  // Helper pour définir la target velocity du boss (appelé par les fonctions de move)
+  setBossTargetVelocity(vx, vy) {
+    if (!this.boss || !this.boss.active) return;
+    this.boss.targetVelX = vx;
+    this.boss.targetVelY = vy;
+  }
+
+  // Helper pour un mouvement soudain (lunge/dash) avec momentum
+  bossLunge(dirX, dirY, force) {
+    if (!this.boss || !this.boss.active || !this.boss.physics) return;
+
+    const phys = this.boss.physics;
+    const actualForce = force || phys.lungeForce || 400;
+
+    // Appliquer une impulsion directe (bypass l'accélération progressive)
+    this.boss.body.velocity.x += dirX * actualForce / phys.mass;
+    this.boss.body.velocity.y += dirY * actualForce / phys.mass;
+
+    // Effet visuel de lunge
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 0.8,
+      scaleY: 1.3,
+      duration: 100,
+      yoyo: true,
+      ease: 'Quad.easeOut'
+    });
+
+    // Particules de thrust
+    this.emitParticles(this.boss.x - dirX * 30, this.boss.y - dirY * 30, {
+      count: 8,
+      colors: [this.bossColor, 0xffffff],
+      minSpeed: 50,
+      maxSpeed: 150,
+      minSize: 3,
+      maxSize: 8,
+      life: 300,
+      spread: Math.PI / 3,
+      angle: Math.atan2(-dirY, -dirX),
+      fadeOut: true
+    });
+  }
+
   createBossUI(name, bossNum, color) {
     const uiDepth = 100;
     const barWidth = 300;
@@ -4544,85 +5244,269 @@ class GameScene extends Phaser.Scene {
   // BOSS 1 : CHARGER - Dash + Tirs en éventail
   // ==========================================
   initBossCharger() {
-    this.boss.body.setVelocity(this.boss.moveSpeed, this.boss.moveSpeed / 2);
+    // === DARK SOULS STYLE: CHARGER ===
+    // - Clear wind-up before charges
+    // - Recovery window after attacks
+    // - Predictable patterns that can be learned
 
+    this.chargerState = 'idle'; // idle, winding, charging, recovering, shooting
+    this.chargerComboCount = 0;
+
+    // Vitesse initiale lente (Dark Souls: bosses start slow)
+    this.setBossTargetVelocity(this.boss.moveSpeed * 0.3, 0);
+
+    // Mouvement lent et menaçant
     this.bossMoveTimer = this.time.addEvent({
-      delay: 2000,
+      delay: 2500,
       callback: this.bossChargerMove,
       callbackScope: this,
       loop: true
     });
 
+    // Attaques avec plus de délai (apprentissage)
     this.bossShootTimer = this.time.addEvent({
-      delay: 1800,
+      delay: 3000, // Plus lent pour permettre l'apprentissage
       callback: this.bossChargerShoot,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer de charge (nouvelle attaque signature)
+    this.chargerChargeTimer = this.time.addEvent({
+      delay: 5000,
+      callback: this.bossChargerWindUp,
       callbackScope: this,
       loop: true
     });
   }
 
   bossChargerMove() {
-    if (!this.boss || !this.boss.active || this.bossDashing) return;
+    if (!this.boss || !this.boss.active) return;
+    if (this.chargerState !== 'idle') return; // Ne bouge pas pendant les attaques
 
     const toPlayerX = this.player.x - this.boss.x;
     const toPlayerY = this.player.y - this.boss.y;
     const playerAbove = this.player.y < this.boss.y - 20;
     const playerAligned = Math.abs(toPlayerX) < 80;
 
-    // Esquive si joueur au-dessus
+    // Esquive si joueur au-dessus (réaction défensive)
     if (playerAbove && playerAligned && !this.bossDashCooldown) {
       const escapeDir = toPlayerX !== 0 ? -Math.sign(toPlayerX) : (Math.random() < 0.5 ? -1 : 1);
-      this.bossDash(escapeDir, 0.3);
+
+      // Animation d'esquive (tell visuel)
+      this.tweens.add({
+        targets: this.boss,
+        scaleX: 0.8,
+        duration: 150,
+        yoyo: true
+      });
+
+      this.bossLunge(escapeDir, -0.3, 400);
+      this.bossDashCooldown = true;
+      this.time.delayedCall(2000, () => this.bossDashCooldown = false);
       return;
     }
 
-    // Phase 2 : Charge vers le joueur parfois
-    if (this.bossPhase >= 2 && Math.random() < 0.4) {
-      const dist = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
-      this.bossDash(toPlayerX / dist, toPlayerY / dist * 0.5);
-      return;
-    }
+    // Mouvement de traque lent (Dark Souls style)
+    const speed = this.boss.moveSpeed * 0.4; // Plus lent
+    const targetX = (toPlayerX > 0 ? 1 : -1) * speed;
+    const targetY = (Math.random() - 0.5) * speed * 0.3;
 
-    // Mouvement normal
-    const speed = this.boss.moveSpeed;
-    this.boss.body.setVelocity(
-      (toPlayerX > 0 ? 1 : -1) * speed * 0.7,
-      (Math.random() - 0.5) * speed
-    );
-
+    // Rester dans les limites
     const maxY = this.WORLD.groundY - 200;
     const minY = 150;
-    if (this.boss.y > maxY) this.boss.body.setVelocityY(-speed);
-    if (this.boss.y < minY) this.boss.body.setVelocityY(speed);
+    let finalTargetY = targetY;
+    if (this.boss.y > maxY) finalTargetY = -speed * 0.5;
+    if (this.boss.y < minY) finalTargetY = speed * 0.5;
+
+    this.setBossTargetVelocity(targetX, finalTargetY);
+  }
+
+  bossChargerWindUp() {
+    if (!this.boss || !this.boss.active) return;
+    if (this.chargerState !== 'idle') return;
+
+    this.chargerState = 'winding';
+    this.setBossTargetVelocity(0, 0); // Arrêt complet
+
+    const toPlayerX = this.player.x - this.boss.x;
+    const toPlayerY = this.player.y - this.boss.y;
+    const dist = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
+
+    // === WIND-UP ANIMATION (CLEAR TELL) ===
+    // Le boss recule et se prépare - le joueur peut réagir
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 0.7,
+      scaleY: 1.3,
+      x: this.boss.x - Math.sign(toPlayerX) * 30,
+      duration: 800, // Long wind-up pour que le joueur voit
+      ease: 'Quad.easeIn',
+      onUpdate: () => {
+        // Particules de charge pendant le wind-up
+        if (Math.random() < 0.3) {
+          this.emitParticles(this.boss.x + Math.sign(toPlayerX) * 20, this.boss.y, {
+            count: 2,
+            colors: [0xff4400, 0xff0000],
+            minSpeed: 30,
+            maxSpeed: 60,
+            minSize: 3,
+            maxSize: 6,
+            life: 300,
+            angle: Math.atan2(toPlayerY, toPlayerX),
+            spread: 0.5,
+            fadeOut: true
+          });
+        }
+      },
+      onComplete: () => {
+        if (!this.boss || !this.boss.active) return;
+        this.bossChargerCharge(toPlayerX / dist, toPlayerY / dist);
+      }
+    });
+
+    // Flash d'avertissement (screen effet)
+    this.cameras.main.flash(100, 255, 100, 100, false);
+  }
+
+  bossChargerCharge(dirX, dirY) {
+    if (!this.boss || !this.boss.active) return;
+
+    this.chargerState = 'charging';
+
+    // === CHARGE! ===
+    const chargeForce = 600 + (this.bossPhase - 1) * 100;
+    this.bossLunge(dirX, dirY * 0.3, chargeForce);
+
+    // Traînée de particules pendant la charge
+    for (let i = 0; i < 8; i++) {
+      this.time.delayedCall(i * 60, () => {
+        if (this.boss && this.boss.active) {
+          this.emitParticles(this.boss.x, this.boss.y, {
+            count: 4,
+            colors: [0xff4400, 0xff6600, 0xffaa00],
+            minSpeed: 20,
+            maxSpeed: 60,
+            minSize: 4,
+            maxSize: 10,
+            life: 250,
+            spread: Math.PI,
+            angle: Math.atan2(-dirY, -dirX),
+            fadeOut: true
+          });
+        }
+      });
+    }
+
+    // === RECOVERY WINDOW (OPENING) ===
+    this.time.delayedCall(600, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      this.chargerState = 'recovering';
+      this.setBossTargetVelocity(0, 0);
+
+      // Animation de récupération (boss vulnérable)
+      this.tweens.add({
+        targets: this.boss,
+        scaleX: 1.2,
+        scaleY: 0.8,
+        duration: 300,
+        yoyo: true,
+        repeat: 1
+      });
+
+      // Particules de fatigue
+      this.emitParticles(this.boss.x, this.boss.y - 20, {
+        count: 5,
+        colors: [0xffff00, 0xffffff],
+        minSpeed: 10,
+        maxSpeed: 30,
+        minSize: 2,
+        maxSize: 4,
+        life: 500,
+        angle: -Math.PI / 2,
+        spread: Math.PI / 3,
+        fadeOut: true
+      });
+
+      // Retour à idle après recovery
+      this.time.delayedCall(1200, () => {
+        if (this.boss && this.boss.active) {
+          this.chargerState = 'idle';
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 200
+          });
+        }
+      });
+    });
   }
 
   bossChargerShoot() {
     if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+    if (this.chargerState !== 'idle') return; // Ne tire pas pendant les autres états
 
-    // Fenêtre d'attaque
-    const playerAbove = this.player.y < this.boss.y - 30;
-    const playerClose = Math.abs(this.player.x - this.boss.x) < 100;
-    if (playerAbove && playerClose && this.player.body.velocity.y > 50) return;
+    this.chargerState = 'shooting';
 
-    // Animation
+    // === TELEGRAPH (TELL VISUEL) ===
+    // Animation de charge du tir
     this.tweens.add({
       targets: this.boss,
-      scaleX: 1.3, scaleY: 1.3,
-      duration: 300,
-      yoyo: true
+      scaleX: 1.2,
+      scaleY: 1.2,
+      duration: 500, // Long telegraph
+      ease: 'Quad.easeIn',
+      onUpdate: () => {
+        // Particules de charge
+        if (Math.random() < 0.4) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 40;
+          this.emitParticles(this.boss.x + Math.cos(angle) * dist, this.boss.y + Math.sin(angle) * dist, {
+            count: 1,
+            colors: [0xff00ff, 0xaa00aa],
+            minSpeed: 40,
+            maxSpeed: 80,
+            minSize: 2,
+            maxSize: 4,
+            life: 200,
+            angle: angle + Math.PI,
+            spread: 0.3,
+            fadeOut: true
+          });
+        }
+      }
     });
 
-    this.time.delayedCall(350, () => {
+    this.time.delayedCall(550, () => {
       if (!this.boss || !this.boss.active || this.bossShotPaused) return;
 
-      const numBullets = 3 + this.bossPhase;
-      const spreadAngle = Math.PI / 4;
+      // === TIR ===
+      const numBullets = 2 + this.bossPhase; // Moins de balles, plus espacées
+      const spreadAngle = Math.PI / 5;
       const baseAngle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
 
       for (let i = 0; i < numBullets; i++) {
         const angle = baseAngle - spreadAngle / 2 + (spreadAngle / (numBullets - 1)) * i;
-        this.createBossBullet(this.boss.x, this.boss.y, angle, 180);
+        this.createBossBullet(this.boss.x, this.boss.y, angle, 150); // Plus lent
       }
+
+      // Animation de recul
+      this.tweens.add({
+        targets: this.boss,
+        scaleX: 0.9,
+        scaleY: 0.9,
+        duration: 150,
+        yoyo: true
+      });
+
+      // Recovery après tir
+      this.time.delayedCall(400, () => {
+        if (this.boss && this.boss.active) {
+          this.chargerState = 'idle';
+        }
+      });
     });
   }
 
@@ -4630,18 +5514,38 @@ class GameScene extends Phaser.Scene {
   // BOSS 2 : SPINNER - Tirs circulaires + Téléport
   // ==========================================
   initBossSpinner() {
-    this.spinnerAngle = 0;
+    // === DARK SOULS STYLE: SPINNER ===
+    // - Predictable rotation patterns
+    // - Clear telegraph before burst attacks
+    // - Recovery "dizzy" period after burst
 
+    this.spinnerAngle = 0;
+    this.spinnerState = 'spinning'; // spinning, charging, bursting, dizzy
+    this.spinnerBurstCount = 0;
+
+    // Mouvement léger en dérive
+    this.setBossTargetVelocity(30, 20);
+
+    // Téléportation avec telegraph
     this.bossMoveTimer = this.time.addEvent({
-      delay: 3000,
+      delay: 4500, // Plus long pour apprendre le pattern
       callback: this.bossSpinnerTeleport,
       callbackScope: this,
       loop: true
     });
 
+    // Tir rotatif (plus lent)
     this.bossShootTimer = this.time.addEvent({
-      delay: 150,
+      delay: 200, // Plus lent
       callback: this.bossSpinnerShoot,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Burst périodique (nouvelle attaque)
+    this.spinnerBurstTimer = this.time.addEvent({
+      delay: 6000,
+      callback: this.bossSpinnerBurstWindUp,
       callbackScope: this,
       loop: true
     });
@@ -4649,13 +5553,58 @@ class GameScene extends Phaser.Scene {
 
   bossSpinnerTeleport() {
     if (!this.boss || !this.boss.active || this.bossHitCooldown) return;
+    if (this.spinnerState !== 'spinning') return;
 
-    // Flash avant téléport
-    this.boss.setAlpha(0.3);
-    this.time.delayedCall(300, () => {
+    // === TELEGRAPH: Visible warning ===
+    this.spinnerState = 'charging';
+
+    // Particules de charge qui convergent
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const startX = this.boss.x + Math.cos(angle) * 60;
+      const startY = this.boss.y + Math.sin(angle) * 60;
+      this.emitParticles(startX, startY, {
+        count: 2,
+        colors: [0x00ffff, 0x00cccc],
+        minSpeed: 60,
+        maxSpeed: 100,
+        minSize: 3,
+        maxSize: 6,
+        life: 400,
+        angle: angle + Math.PI,
+        spread: 0.3,
+        fadeOut: true
+      });
+    }
+
+    // Animation de charge (boss visible qui prépare)
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 0.6,
+      scaleY: 0.6,
+      alpha: 0.4,
+      duration: 600,
+      ease: 'Quad.easeIn'
+    });
+
+    this.time.delayedCall(700, () => {
       if (!this.boss || !this.boss.active) return;
 
-      // Nouvelle position (évite le joueur)
+      // === TELEPORT ===
+      // Particules de disparition
+      this.emitParticles(this.boss.x, this.boss.y, {
+        count: 20,
+        colors: [0x00ffff, 0x00cccc, 0xffffff],
+        minSpeed: 100,
+        maxSpeed: 200,
+        minSize: 3,
+        maxSize: 8,
+        life: 400,
+        spread: Math.PI * 2,
+        fadeOut: true
+      });
+
+      // Nouvelle position
       let newX, newY;
       const minX = 200;
       const maxX = this.WORLD.width - 200;
@@ -4668,23 +5617,172 @@ class GameScene extends Phaser.Scene {
 
       this.boss.x = newX;
       this.boss.y = newY;
-      this.boss.setAlpha(1);
 
-      // Burst de balles après téléport - PERÇANTES en phase 2!
-      // Ne tire pas si invincible (bossHitCooldown)
-      if (this.bossPhase >= 2 && !this.bossHitCooldown) {
-        for (let i = 0; i < 8; i++) {
-          this.createPiercingBullet(this.boss.x, this.boss.y, (Math.PI * 2 / 8) * i, 150);
+      // Réapparition
+      this.tweens.add({
+        targets: this.boss,
+        scaleX: 1,
+        scaleY: 1,
+        alpha: 1,
+        duration: 300,
+        ease: 'Back.easeOut'
+      });
+
+      // Particules de réapparition
+      this.emitParticles(newX, newY, {
+        count: 15,
+        colors: [0x00ffff, 0xffffff],
+        minSpeed: 50,
+        maxSpeed: 100,
+        minSize: 2,
+        maxSize: 5,
+        life: 300,
+        spread: Math.PI * 2,
+        fadeOut: true
+      });
+
+      this.spinnerState = 'spinning';
+    });
+  }
+
+  bossSpinnerBurstWindUp() {
+    if (!this.boss || !this.boss.active) return;
+    if (this.spinnerState !== 'spinning') return;
+
+    this.spinnerState = 'charging';
+
+    // === WIND-UP pour burst ===
+    // Animation visuelle claire
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.4,
+      scaleY: 1.4,
+      duration: 800,
+      ease: 'Quad.easeIn',
+      onUpdate: () => {
+        // Particules qui convergent (tell visuel)
+        if (Math.random() < 0.5) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 80;
+          this.emitParticles(this.boss.x + Math.cos(angle) * dist, this.boss.y + Math.sin(angle) * dist, {
+            count: 1,
+            colors: [0x00ffff, 0xff0000],
+            minSpeed: 80,
+            maxSpeed: 120,
+            minSize: 3,
+            maxSize: 6,
+            life: 300,
+            angle: angle + Math.PI,
+            spread: 0.2,
+            fadeOut: true
+          });
         }
       }
+    });
+
+    // Flash d'avertissement
+    this.cameras.main.flash(100, 0, 200, 200, false);
+
+    this.time.delayedCall(900, () => {
+      if (!this.boss || !this.boss.active) return;
+      this.bossSpinnerBurst();
+    });
+  }
+
+  bossSpinnerBurst() {
+    if (!this.boss || !this.boss.active) return;
+
+    this.spinnerState = 'bursting';
+
+    // === BURST! ===
+    const numWaves = this.bossPhase >= 2 ? 3 : 2;
+
+    for (let wave = 0; wave < numWaves; wave++) {
+      this.time.delayedCall(wave * 300, () => {
+        if (!this.boss || !this.boss.active) return;
+
+        const bulletsPerWave = 8;
+        const offset = wave * (Math.PI / 8);
+
+        for (let i = 0; i < bulletsPerWave; i++) {
+          const angle = (i / bulletsPerWave) * Math.PI * 2 + offset;
+          if (this.bossPhase >= 2) {
+            this.createPiercingBullet(this.boss.x, this.boss.y, angle, 130);
+          } else {
+            this.createBossBullet(this.boss.x, this.boss.y, angle, 120);
+          }
+        }
+
+        // Animation de contraction à chaque vague
+        this.tweens.add({
+          targets: this.boss,
+          scaleX: 0.9,
+          scaleY: 0.9,
+          duration: 100,
+          yoyo: true
+        });
+      });
+    }
+
+    // === DIZZY RECOVERY (Opening) ===
+    this.time.delayedCall(numWaves * 300 + 200, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      this.spinnerState = 'dizzy';
+      this.spinnerAngle = 0; // Reset rotation
+
+      // Animation de vertige
+      this.tweens.add({
+        targets: this.boss,
+        scaleX: 0.8,
+        scaleY: 1.1,
+        duration: 200,
+        yoyo: true,
+        repeat: 2
+      });
+
+      // Particules de vertige
+      for (let i = 0; i < 5; i++) {
+        this.time.delayedCall(i * 150, () => {
+          if (this.boss && this.boss.active) {
+            const angle = (i / 5) * Math.PI * 2;
+            this.emitParticles(this.boss.x + Math.cos(angle) * 25, this.boss.y - 20, {
+              count: 2,
+              colors: [0xffff00, 0xffffff],
+              minSpeed: 10,
+              maxSpeed: 30,
+              minSize: 3,
+              maxSize: 5,
+              life: 400,
+              angle: -Math.PI / 2,
+              spread: 0.5,
+              fadeOut: true
+            });
+          }
+        });
+      }
+
+      // Retour à la normale après recovery
+      this.time.delayedCall(1500, () => {
+        if (this.boss && this.boss.active) {
+          this.spinnerState = 'spinning';
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 200
+          });
+        }
+      });
     });
   }
 
   bossSpinnerShoot() {
     if (!this.boss || !this.boss.active || this.bossShotPaused || this.bossHitCooldown) return;
+    if (this.spinnerState !== 'spinning') return; // Ne tire pas pendant les autres états
 
-    // Tir rotatif continu
-    const speed = this.bossPhase >= 2 ? 140 : 120;
+    // Tir rotatif continu (plus lent)
+    const speed = this.bossPhase >= 2 ? 120 : 100;
     this.createBossBullet(this.boss.x, this.boss.y, this.spinnerAngle, speed);
 
     // Double hélice en phase 2
@@ -4692,56 +5790,231 @@ class GameScene extends Phaser.Scene {
       this.createBossBullet(this.boss.x, this.boss.y, this.spinnerAngle + Math.PI, speed);
     }
 
-    this.spinnerAngle += 0.15;
+    this.spinnerAngle += 0.12; // Plus lent
   }
 
   // ==========================================
   // BOSS 3 : SPLITTER - Se divise en mini-boss
   // ==========================================
   initBossSplitter() {
+    // === DARK SOULS STYLE: SPLITTER ===
+    // - Wind-up before splitting
+    // - Recovery after spawning minions
+    // - Clear tells before bounces
+
     this.splitterMinions = [];
+    this.splitterState = 'idle'; // idle, charging, splitting, recovering
+    this.splitterBounceCount = 0;
+
+    // Mouvement élastique plus lent
+    this.setBossTargetVelocity(40, 30);
 
     this.bossMoveTimer = this.time.addEvent({
-      delay: 1500,
+      delay: 2000,
       callback: this.bossSplitterMove,
       callbackScope: this,
       loop: true
     });
 
     this.bossShootTimer = this.time.addEvent({
-      delay: 2000,
+      delay: 2500,
       callback: this.bossSplitterShoot,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer de split (spawn minions)
+    this.splitterSplitTimer = this.time.addEvent({
+      delay: 7000,
+      callback: this.bossSplitterWindUp,
       callbackScope: this,
       loop: true
     });
   }
 
   bossSplitterMove() {
-    if (!this.boss || !this.boss.active || this.bossDashing) return;
+    if (!this.boss || !this.boss.active) return;
+    if (this.splitterState !== 'idle') return;
 
     const toPlayerX = this.player.x - this.boss.x;
-    const speed = this.boss.moveSpeed;
+    const toPlayerY = this.player.y - this.boss.y;
+    const speed = this.boss.moveSpeed * 0.5; // Plus lent
 
-    // Rebondit sur les bords
     const minX = 150;
     const maxX = this.WORLD.width - 150;
     const minY = 100;
     const maxY = this.WORLD.groundY - 100;
-    if (this.boss.x < minX) this.boss.body.setVelocityX(speed);
-    else if (this.boss.x > maxX) this.boss.body.setVelocityX(-speed);
-    else this.boss.body.setVelocityX((toPlayerX > 0 ? 1 : -1) * speed * 0.5);
 
-    this.boss.body.setVelocityY((Math.random() - 0.5) * speed);
-    if (this.boss.y > maxY) this.boss.body.setVelocityY(-speed);
-    if (this.boss.y < minY) this.boss.body.setVelocityY(speed);
+    let targetX = (toPlayerX > 0 ? 1 : -1) * speed * 0.5;
+    let targetY = (Math.random() - 0.5) * speed * 0.4;
+
+    // Ajustements pour les limites
+    if (this.boss.x < minX + 50) targetX = speed;
+    else if (this.boss.x > maxX - 50) targetX = -speed;
+    if (this.boss.y > maxY - 50) targetY = -speed * 0.5;
+    if (this.boss.y < minY + 50) targetY = speed * 0.5;
+
+    // === BOUNCE avec WIND-UP ===
+    if (Math.random() < 0.12 && this.splitterBounceCount < 2) {
+      this.splitterState = 'charging';
+      this.splitterBounceCount++;
+
+      // Wind-up animation (tell)
+      this.tweens.add({
+        targets: this.boss,
+        scaleX: 0.7,
+        scaleY: 1.3,
+        duration: 400,
+        ease: 'Quad.easeIn',
+        onComplete: () => {
+          if (!this.boss || !this.boss.active) return;
+
+          const dist = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
+          this.bossLunge(toPlayerX / dist * 0.7, toPlayerY / dist * 0.4, 300);
+
+          // Squash après bounce
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 1.2,
+            scaleY: 0.8,
+            duration: 150,
+            yoyo: true,
+            onComplete: () => {
+              this.splitterState = 'idle';
+              this.time.delayedCall(800, () => this.splitterBounceCount = 0);
+            }
+          });
+        }
+      });
+      return;
+    }
+
+    this.setBossTargetVelocity(targetX, targetY);
+  }
+
+  bossSplitterWindUp() {
+    if (!this.boss || !this.boss.active) return;
+    if (this.splitterState !== 'idle') return;
+    if (this.splitterMinions.filter(m => m.active).length >= 3) return; // Max minions
+
+    this.splitterState = 'charging';
+
+    // === WIND-UP: Gonflement avant split ===
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.5,
+      scaleY: 1.5,
+      duration: 1000,
+      ease: 'Quad.easeIn',
+      onUpdate: () => {
+        // Particules de charge
+        if (Math.random() < 0.4) {
+          this.emitParticles(this.boss.x + (Math.random() - 0.5) * 40, this.boss.y + (Math.random() - 0.5) * 40, {
+            count: 2,
+            colors: [0xffff00, 0xcccc00],
+            minSpeed: 20,
+            maxSpeed: 50,
+            minSize: 3,
+            maxSize: 6,
+            life: 300,
+            fadeOut: true
+          });
+        }
+      }
+    });
+
+    // Flash d'avertissement
+    this.cameras.main.flash(100, 200, 200, 0, false);
+
+    this.time.delayedCall(1100, () => {
+      if (!this.boss || !this.boss.active) return;
+      this.bossSplitterSplit();
+    });
+  }
+
+  bossSplitterSplit() {
+    if (!this.boss || !this.boss.active) return;
+
+    this.splitterState = 'splitting';
+
+    // === SPLIT! ===
+    // Animation de contraction rapide
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 0.6,
+      scaleY: 0.6,
+      duration: 150,
+      ease: 'Quad.easeOut'
+    });
+
+    // Spawn minion avec délai
+    const spawnX = this.boss.x + (Math.random() - 0.5) * 60;
+    const spawnY = this.boss.y + (Math.random() - 0.5) * 40;
+    this.spawnSplitterMinion(spawnX, spawnY);
+
+    // === RECOVERY (Opening) ===
+    this.time.delayedCall(300, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      this.splitterState = 'recovering';
+
+      // Animation de fatigue
+      this.tweens.add({
+        targets: this.boss,
+        scaleX: 1.1,
+        scaleY: 0.9,
+        duration: 200,
+        yoyo: true,
+        repeat: 2
+      });
+
+      // Particules de fatigue
+      this.emitParticles(this.boss.x, this.boss.y - 15, {
+        count: 5,
+        colors: [0xffff00, 0xffffff],
+        minSpeed: 10,
+        maxSpeed: 30,
+        minSize: 2,
+        maxSize: 4,
+        life: 500,
+        angle: -Math.PI / 2,
+        spread: Math.PI / 3,
+        fadeOut: true
+      });
+
+      // Retour à idle après recovery
+      this.time.delayedCall(1200, () => {
+        if (this.boss && this.boss.active) {
+          this.splitterState = 'idle';
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 200
+          });
+        }
+      });
+    });
   }
 
   bossSplitterShoot() {
     if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+    if (this.splitterState !== 'idle') return;
 
-    // Tir vers le joueur
-    const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
-    this.createBossBullet(this.boss.x, this.boss.y, angle, 160);
+    // Telegraph du tir
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.15,
+      scaleY: 1.15,
+      duration: 300,
+      yoyo: true
+    });
+
+    this.time.delayedCall(350, () => {
+      if (!this.boss || !this.boss.active) return;
+      const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
+      this.createBossBullet(this.boss.x, this.boss.y, angle, 140);
+    });
   }
 
   spawnSplitterMinion(x, y) {
@@ -4818,27 +6091,199 @@ class GameScene extends Phaser.Scene {
   // BOSS 4 : GUARDIAN - Bouclier + Laser
   // ==========================================
   initBossGuardian() {
+    // === DARK SOULS STYLE: GUARDIAN ===
+    // - Predictable shield pattern (opens for attack)
+    // - Clear laser telegraph with long wind-up
+    // - Heavy slam with long recovery
+
     this.guardianShield = true;
+    this.guardianState = 'guarding'; // guarding, vulnerable, charging, slamming, recovering
     this.guardianShieldSprite = this.add.circle(this.boss.x, this.boss.y, 50, 0x0099ff, 0.3);
     this.guardianShieldSprite.setStrokeStyle(3, 0x00ccff);
 
-    // Le bouclier se désactive périodiquement
+    // Le bouclier se désactive périodiquement (plus long pour pattern learning)
     this.bossMoveTimer = this.time.addEvent({
-      delay: 4000,
+      delay: 5000,
       callback: this.bossGuardianToggleShield,
       callbackScope: this,
       loop: true
     });
 
+    // Laser avec plus de telegraph
     this.bossShootTimer = this.time.addEvent({
-      delay: 2500,
-      callback: this.bossGuardianLaser,
+      delay: 4000,
+      callback: this.bossGuardianLaserWindUp,
       callbackScope: this,
       loop: true
     });
 
-    // Mouvement lent
-    this.boss.body.setVelocity(40, 30);
+    // Mouvement très lent et massif
+    this.setBossTargetVelocity(20, 15);
+
+    // Timer de mouvement lent
+    this.guardianMoveTimer = this.time.addEvent({
+      delay: 3500,
+      callback: this.bossGuardianMove,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer de slam (nouvelle attaque)
+    this.guardianSlamTimer = this.time.addEvent({
+      delay: 6000,
+      callback: this.bossGuardianSlamWindUp,
+      callbackScope: this,
+      loop: true
+    });
+  }
+
+  bossGuardianMove() {
+    if (!this.boss || !this.boss.active) return;
+    if (this.guardianState !== 'guarding' && this.guardianState !== 'vulnerable') return;
+
+    const toPlayerX = this.player.x - this.boss.x;
+    const toPlayerY = this.player.y - this.boss.y;
+    const dist = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
+    const speed = this.boss.moveSpeed * 0.3; // Très lent
+
+    // Mouvement massif et implacable
+    const targetX = (toPlayerX / dist) * speed;
+    const targetY = (toPlayerY / dist) * speed * 0.3;
+
+    this.setBossTargetVelocity(targetX, targetY);
+  }
+
+  bossGuardianSlamWindUp() {
+    if (!this.boss || !this.boss.active) return;
+    if (this.guardianState !== 'guarding' && this.guardianState !== 'vulnerable') return;
+
+    this.guardianState = 'charging';
+
+    // === WIND-UP: Rise up before slam ===
+    this.tweens.add({
+      targets: this.boss,
+      y: this.boss.y - 50,
+      scaleX: 0.9,
+      scaleY: 1.2,
+      duration: 800,
+      ease: 'Quad.easeIn',
+      onUpdate: () => {
+        // Particules de charge
+        if (Math.random() < 0.4) {
+          this.emitParticles(this.boss.x, this.boss.y + 30, {
+            count: 2,
+            colors: [0x0099ff, 0x00ccff],
+            minSpeed: 50,
+            maxSpeed: 100,
+            minSize: 3,
+            maxSize: 6,
+            life: 300,
+            angle: Math.PI / 2,
+            spread: 0.5,
+            fadeOut: true
+          });
+        }
+      }
+    });
+
+    // Flash d'avertissement
+    this.cameras.main.flash(100, 0, 100, 200, false);
+
+    this.time.delayedCall(900, () => {
+      if (!this.boss || !this.boss.active) return;
+      this.bossGuardianSlam();
+    });
+  }
+
+  bossGuardianSlam() {
+    if (!this.boss || !this.boss.active) return;
+
+    this.guardianState = 'slamming';
+
+    // === SLAM DOWN! ===
+    const targetY = this.WORLD.groundY - 120;
+
+    this.tweens.add({
+      targets: this.boss,
+      y: targetY,
+      scaleX: 1.3,
+      scaleY: 0.7,
+      duration: 200,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        if (!this.boss || !this.boss.active) return;
+
+        // Impact!
+        this.cameras.main.shake(300, 0.025);
+
+        // Onde de choc
+        this.emitParticles(this.boss.x, targetY + 20, {
+          count: 30,
+          colors: [0x0099ff, 0x00ccff, 0xffffff],
+          minSpeed: 100,
+          maxSpeed: 250,
+          minSize: 4,
+          maxSize: 12,
+          life: 500,
+          angle: -Math.PI / 2,
+          spread: Math.PI * 0.6,
+          gravity: 200,
+          fadeOut: true
+        });
+
+        // Projectiles en éventail
+        for (let i = 0; i < 5; i++) {
+          const angle = -Math.PI / 2 + (i - 2) * 0.4;
+          this.createBossBullet(this.boss.x, this.boss.y + 20, angle + Math.PI, 100);
+        }
+
+        // === RECOVERY (Long opening!) ===
+        this.time.delayedCall(300, () => {
+          if (!this.boss || !this.boss.active) return;
+
+          this.guardianState = 'recovering';
+
+          // Animation de récupération lente
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 1.1,
+            scaleY: 0.9,
+            duration: 300,
+            yoyo: true,
+            repeat: 2
+          });
+
+          // Particules de fatigue
+          this.emitParticles(this.boss.x, this.boss.y - 20, {
+            count: 8,
+            colors: [0x0066aa, 0xffffff],
+            minSpeed: 10,
+            maxSpeed: 30,
+            minSize: 2,
+            maxSize: 5,
+            life: 600,
+            angle: -Math.PI / 2,
+            spread: Math.PI / 3,
+            fadeOut: true
+          });
+
+          // Retour à la normale après long recovery
+          this.time.delayedCall(1800, () => {
+            if (this.boss && this.boss.active) {
+              this.guardianState = this.guardianShield ? 'guarding' : 'vulnerable';
+              this.tweens.add({
+                targets: this.boss,
+                scaleX: 1,
+                scaleY: 1,
+                y: 200,
+                duration: 500,
+                ease: 'Quad.easeOut'
+              });
+            }
+          });
+        });
+      }
+    });
   }
 
   bossGuardianToggleShield() {
@@ -4909,25 +6354,32 @@ class GameScene extends Phaser.Scene {
     }
   }
 
-  bossGuardianLaser() {
+  bossGuardianLaserWindUp() {
     if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+    if (this.guardianState !== 'guarding' && this.guardianState !== 'vulnerable') return;
 
-    // Warning line
+    // === LONG TELEGRAPH for laser ===
     const targetY = this.player.y;
-    const warningLine = this.add.rectangle(this.WORLD.width / 2, targetY, this.WORLD.width, 4, 0xff0000, 0.5);
 
+    // Warning line qui pulse (très visible)
+    const warningLine = this.add.rectangle(this.WORLD.width / 2, targetY, this.WORLD.width, 6, 0xff0000, 0.3);
+    warningLine.setDepth(50);
+
+    // Animation de warning longue et claire
     this.tweens.add({
       targets: warningLine,
-      alpha: 0,
-      duration: 800,
+      alpha: 0.8,
+      duration: 200,
+      yoyo: true,
+      repeat: 4, // Long telegraph
       onComplete: () => {
         warningLine.destroy();
         if (!this.boss || !this.boss.active) return;
 
-        // SFX de laser
+        // === FIRE LASER ===
         this.playSound('laser');
 
-        // Particules de charge avant le laser
+        // Particules de charge
         for (let i = 0; i < 5; i++) {
           this.emitParticles(this.boss.x, this.boss.y, {
             count: 5,
@@ -4957,6 +6409,7 @@ class GameScene extends Phaser.Scene {
 
         // Laser horizontal
         const laser = this.add.rectangle(this.WORLD.width / 2, targetY, this.WORLD.width, 20, 0x00ccff, 0.8);
+        laser.setDepth(51);
         this.physics.add.existing(laser);
         laser.body.setAllowGravity(false);
         this.physics.add.overlap(this.player, laser, () => {
@@ -4988,55 +6441,143 @@ class GameScene extends Phaser.Scene {
   // BOSS 5 : SUMMONER - Invoque des ennemis
   // ==========================================
   initBossSummoner() {
-    this.summonedEnemies = [];
+    // === DARK SOULS STYLE: SUMMONER ===
+    // - Long ritual wind-up for summoning
+    // - Recovery after summoning (vulnerable)
+    // - Predictable movement patterns
 
-    // Le boss reste en haut et invoque
-    this.boss.body.setVelocity(0, 0);
+    this.summonedEnemies = [];
+    this.summonerState = 'drifting'; // drifting, channeling, summoning, recovering
+
+    // Le boss commence en haut avec dérive éthérée
     this.boss.x = this.WORLD.width / 2;
     this.boss.y = 150;
+    this.setBossTargetVelocity(0, 0);
 
-    this.bossMoveTimer = this.time.addEvent({
-      delay: 3500,
-      callback: this.bossSummonerSummon,
+    // Timer de mouvement éthéré (plus lent)
+    this.summonerDriftTimer = this.time.addEvent({
+      delay: 2500,
+      callback: this.bossSummonerDrift,
       callbackScope: this,
       loop: true
     });
 
+    // Invocation avec long wind-up
+    this.bossMoveTimer = this.time.addEvent({
+      delay: 5000, // Plus long pour apprendre le pattern
+      callback: this.bossSummonerSummonWindUp,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Tir avec telegraph
     this.bossShootTimer = this.time.addEvent({
-      delay: 2000,
+      delay: 3000,
       callback: this.bossSummonerShoot,
       callbackScope: this,
       loop: true
     });
   }
 
-  bossSummonerSummon() {
+  bossSummonerDrift() {
     if (!this.boss || !this.boss.active) return;
+    if (this.summonerState !== 'drifting') return;
+
+    // Mouvement éthéré mystique - dérive fluide (plus prévisible)
+    const time = this.time.now;
+    const speed = this.boss.moveSpeed * 0.3;
+
+    // Pattern circulaire prévisible
+    const driftAngle = time * 0.001;
+    const targetX = Math.cos(driftAngle) * speed;
+    const targetY = Math.sin(driftAngle * 0.5) * speed * 0.3;
+
+    // Rester dans la zone haute
+    if (this.boss.y > 250) {
+      this.setBossTargetVelocity(targetX, -speed * 0.4);
+    } else if (this.boss.y < 100) {
+      this.setBossTargetVelocity(targetX, speed * 0.2);
+    } else {
+      this.setBossTargetVelocity(targetX, targetY);
+    }
+  }
+
+  bossSummonerSummonWindUp() {
+    if (!this.boss || !this.boss.active) return;
+    if (this.summonerState !== 'drifting') return;
 
     // Limite le nombre d'invocations
     this.summonedEnemies = this.summonedEnemies.filter(e => e.active);
-    if (this.summonedEnemies.length >= 3) return;
+    if (this.summonedEnemies.length >= 2) return; // Max 2 minions
 
-    // Particules de charge magique
+    this.summonerState = 'channeling';
+
+    // === LONG WIND-UP: Rituel de channeling ===
+    this.setBossTargetVelocity(0, 0); // Arrêt
+
+    // Animation de channeling (très visible)
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.4,
+      scaleY: 1.4,
+      duration: 1200,
+      ease: 'Quad.easeIn',
+      onUpdate: () => {
+        // Particules de rituel qui convergent
+        if (Math.random() < 0.5) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 80;
+          this.emitParticles(this.boss.x + Math.cos(angle) * dist, this.boss.y + Math.sin(angle) * dist, {
+            count: 2,
+            colors: [0xff00ff, 0xaa00aa, 0xff66cc],
+            minSpeed: 60,
+            maxSpeed: 100,
+            minSize: 3,
+            maxSize: 6,
+            life: 400,
+            angle: angle + Math.PI,
+            spread: 0.3,
+            fadeOut: true
+          });
+        }
+      }
+    });
+
+    // Flash d'avertissement
+    this.cameras.main.flash(100, 200, 0, 200, false);
+
+    this.time.delayedCall(1300, () => {
+      if (!this.boss || !this.boss.active) return;
+      this.bossSummonerSummon();
+    });
+  }
+
+  bossSummonerSummon() {
+    if (!this.boss || !this.boss.active) return;
+
+    this.summonerState = 'summoning';
+
+    // === SUMMON! ===
+    // Explosion de particules
     this.emitParticles(this.boss.x, this.boss.y, {
-      count: 20,
+      count: 30,
       colors: [0xff00ff, 0xff66cc, 0xaa00aa, 0xffffff],
-      minSpeed: 50,
-      maxSpeed: 150,
-      minSize: 3,
-      maxSize: 8,
+      minSpeed: 80,
+      maxSpeed: 180,
+      minSize: 4,
+      maxSize: 10,
       life: 500,
       spread: Math.PI * 2,
       fadeOut: true,
       shape: 'star'
     });
 
-    // Animation d'invocation
+    // Animation de contraction
     this.tweens.add({
       targets: this.boss,
-      scaleX: 1.3, scaleY: 0.7,
-      duration: 300,
-      yoyo: true
+      scaleX: 0.7, scaleY: 0.7,
+      duration: 150,
+      ease: 'Quad.easeOut'
     });
 
     // Spawn ennemi avec particules
@@ -5080,27 +6621,122 @@ class GameScene extends Phaser.Scene {
       this.physics.add.collider(enemy, this.platforms);
       this.physics.add.overlap(this.player, enemy, (p, e) => this.hitSummonedEnemy(p, e), null, this);
     });
+
+    // === RECOVERY (OPENING - Dark Souls style) ===
+    this.time.delayedCall(800, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      this.summonerState = 'recovering';
+
+      // Visuel d'épuisement - boss vulnérable
+      this.boss.setAlpha(0.6);
+      this.tweens.add({
+        targets: this.boss,
+        scaleX: 0.9, scaleY: 1.1,
+        duration: 200,
+        yoyo: true,
+        repeat: 3,
+        ease: 'Sine.easeInOut'
+      });
+
+      // Particules d'énergie qui s'échappent (signe de faiblesse)
+      const exhaustTimer = this.time.addEvent({
+        delay: 150,
+        callback: () => {
+          if (this.boss && this.boss.active && this.summonerState === 'recovering') {
+            this.emitParticles(this.boss.x + Phaser.Math.Between(-30, 30), this.boss.y, {
+              count: 3,
+              colors: [0xff00ff, 0xaa0088],
+              minSpeed: 20,
+              maxSpeed: 50,
+              minSize: 2,
+              maxSize: 5,
+              life: 400,
+              angle: -Math.PI / 2,
+              spread: Math.PI / 3,
+              fadeOut: true
+            });
+          }
+        },
+        repeat: 8
+      });
+
+      // Fin de la récupération - retour au combat
+      this.time.delayedCall(1500, () => {
+        if (!this.boss || !this.boss.active) return;
+
+        this.summonerState = 'drifting';
+        this.boss.setAlpha(1);
+
+        // Animation de réveil
+        this.tweens.add({
+          targets: this.boss,
+          scaleX: 1.2, scaleY: 0.8,
+          duration: 150,
+          yoyo: true,
+          ease: 'Quad.easeOut'
+        });
+      });
+    });
   }
 
   bossSummonerShoot() {
     if (!this.boss || !this.boss.active || this.bossShotPaused) return;
 
-    // Pluie de projectiles - un perçant au milieu en phase 2
-    const numBullets = this.bossPhase >= 2 ? 5 : 3;
-    for (let i = 0; i < numBullets; i++) {
-      const angle = Math.PI / 2 + (Math.random() - 0.5) * 0.8;
-      this.time.delayedCall(i * 120, () => {
+    // === DARK SOULS: Ne tire que pendant drifting ===
+    if (this.summonerState !== 'drifting') return;
+
+    // === TELEGRAPH (Wind-up) ===
+    // Flash d'avertissement
+    this.boss.setTint(0xff66ff);
+    this.tweens.add({
+      targets: this.boss,
+      scaleY: 1.15,
+      duration: 300,
+      yoyo: true,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
         if (this.boss && this.boss.active) {
-          const isPiercing = this.bossPhase >= 2 && i === Math.floor(numBullets / 2);
-          const x = this.boss.x + Phaser.Math.Between(-50, 50);
-          if (isPiercing) {
-            this.createPiercingBullet(x, this.boss.y + 30, Math.PI / 2, 160);
-          } else {
-            this.createBossBullet(x, this.boss.y + 30, angle, 140);
-          }
+          this.boss.clearTint();
         }
-      });
-    }
+      }
+    });
+
+    // Particules de charge avant tir
+    this.emitParticles(this.boss.x, this.boss.y + 20, {
+      count: 8,
+      colors: [0xff00ff, 0xff66cc],
+      minSpeed: 30,
+      maxSpeed: 60,
+      minSize: 3,
+      maxSize: 6,
+      life: 300,
+      angle: Math.PI / 2,
+      spread: Math.PI / 4,
+      fadeOut: true
+    });
+
+    // Délai avant le tir réel (temps de réaction pour le joueur)
+    this.time.delayedCall(350, () => {
+      if (!this.boss || !this.boss.active || this.summonerState !== 'drifting') return;
+
+      // Pluie de projectiles - un perçant au milieu en phase 2
+      const numBullets = this.bossPhase >= 2 ? 5 : 3;
+      for (let i = 0; i < numBullets; i++) {
+        const angle = Math.PI / 2 + (Math.random() - 0.5) * 0.8;
+        this.time.delayedCall(i * 120, () => {
+          if (this.boss && this.boss.active) {
+            const isPiercing = this.bossPhase >= 2 && i === Math.floor(numBullets / 2);
+            const x = this.boss.x + Phaser.Math.Between(-50, 50);
+            if (isPiercing) {
+              this.createPiercingBullet(x, this.boss.y + 30, Math.PI / 2, 160);
+            } else {
+              this.createBossBullet(x, this.boss.y + 30, angle, 140);
+            }
+          }
+        });
+      }
+    });
   }
 
   hitSummonedEnemy(player, enemy) {
@@ -5115,6 +6751,1260 @@ class GameScene extends Phaser.Scene {
       this.score += 30;
       this.scoreText.setText(this.score.toString().padStart(6, '0'));
       player.body.setVelocityY(-300);
+    } else {
+      this.takeDamage();
+    }
+  }
+
+  // ==========================================
+  // BOSS 6 : CRUSHER - Écraseur gravitationnel
+  // ==========================================
+  initBossCrusher() {
+    // CRUSHER est lent mais dévastateur - slams au sol, ondes de choc
+    this.boss.x = this.WORLD.width / 2;
+    this.boss.y = 200;
+    this.setBossTargetVelocity(0, 0);
+
+    // État du slam
+    this.crusherSlamming = false;
+    this.crusherShockwaves = [];
+
+    // Timer de mouvement lent et menaçant
+    this.bossMoveTimer = this.time.addEvent({
+      delay: 2500,
+      callback: this.bossCrusherMove,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer de slam (attaque principale)
+    this.bossShootTimer = this.time.addEvent({
+      delay: 4000,
+      callback: this.bossCrusherSlam,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer de projectiles lourds
+    this.crusherRockTimer = this.time.addEvent({
+      delay: 3000,
+      callback: this.bossCrusherThrowRock,
+      callbackScope: this,
+      loop: true
+    });
+  }
+
+  bossCrusherMove() {
+    if (!this.boss || !this.boss.active || this.crusherSlamming) return;
+
+    const toPlayerX = this.player.x - this.boss.x;
+    const speed = this.boss.moveSpeed * 0.3; // Très lent
+
+    // Se positionner au-dessus du joueur lentement
+    if (Math.abs(toPlayerX) > 80) {
+      this.setBossTargetVelocity(Math.sign(toPlayerX) * speed, 0);
+    } else {
+      // Au-dessus du joueur - préparation du slam
+      this.setBossTargetVelocity(0, -speed * 0.5);
+    }
+
+    // Rester dans la zone haute
+    if (this.boss.y > 280) {
+      this.setBossTargetVelocity(this.boss.targetVelX, -speed);
+    }
+    if (this.boss.y < 120) {
+      this.setBossTargetVelocity(this.boss.targetVelX, speed * 0.3);
+    }
+  }
+
+  bossCrusherSlam() {
+    if (!this.boss || !this.boss.active || this.crusherSlamming) return;
+
+    this.crusherSlamming = true;
+
+    // Animation de préparation (monte légèrement)
+    this.tweens.add({
+      targets: this.boss,
+      y: this.boss.y - 40,
+      scaleX: 0.9,
+      scaleY: 1.2,
+      duration: 600,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        if (!this.boss || !this.boss.active) return;
+
+        // SLAM DOWN!
+        const targetY = this.WORLD.groundY - 100;
+        this.tweens.add({
+          targets: this.boss,
+          y: targetY,
+          scaleX: 1.3,
+          scaleY: 0.7,
+          duration: 200,
+          ease: 'Quad.easeIn',
+          onComplete: () => {
+            if (!this.boss || !this.boss.active) return;
+
+            // Impact au sol
+            this.cameras.main.shake(400, 0.03);
+
+            // Onde de choc au sol
+            this.createCrusherShockwave(this.boss.x, targetY + 30);
+
+            // Particules d'impact
+            this.emitParticles(this.boss.x, targetY + 30, {
+              count: 40,
+              colors: [0x884422, 0x553311, 0xaa6633, 0xffffff],
+              minSpeed: 150,
+              maxSpeed: 350,
+              minSize: 5,
+              maxSize: 15,
+              life: 600,
+              angle: -Math.PI / 2,
+              spread: Math.PI * 0.8,
+              gravity: 300,
+              fadeOut: true
+            });
+
+            // Retour à la normale
+            this.time.delayedCall(400, () => {
+              if (this.boss && this.boss.active) {
+                this.tweens.add({
+                  targets: this.boss,
+                  scaleX: 1,
+                  scaleY: 1,
+                  y: 200,
+                  duration: 800,
+                  ease: 'Quad.easeOut'
+                });
+                this.crusherSlamming = false;
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+
+  createCrusherShockwave(x, y) {
+    // Onde de choc visuelle qui se propage
+    const wave = this.add.ellipse(x, y, 30, 15, 0xcc6600, 0.6);
+    wave.setStrokeStyle(4, 0xff8800);
+    wave.setDepth(25);
+
+    this.tweens.add({
+      targets: wave,
+      scaleX: 15,
+      scaleY: 3,
+      alpha: 0,
+      duration: 600,
+      ease: 'Quad.easeOut',
+      onComplete: () => wave.destroy()
+    });
+
+    // Dégâts sur l'onde (vérification périodique)
+    const checkDamage = this.time.addEvent({
+      delay: 50,
+      repeat: 10,
+      callback: () => {
+        if (!this.player || this.isInvincible) return;
+        const waveLeft = x - wave.scaleX * 15;
+        const waveRight = x + wave.scaleX * 15;
+        const playerOnGround = this.player.body.blocked.down || this.player.body.touching.down;
+
+        if (playerOnGround && this.player.x > waveLeft && this.player.x < waveRight) {
+          this.takeDamage();
+        }
+      }
+    });
+  }
+
+  bossCrusherThrowRock() {
+    if (!this.boss || !this.boss.active || this.crusherSlamming) return;
+
+    // Lancer un gros projectile lent
+    const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
+
+    // Animation de lancer
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.2,
+      scaleY: 0.8,
+      duration: 200,
+      yoyo: true
+    });
+
+    this.time.delayedCall(250, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      // Créer le rocher
+      const rock = this.add.circle(this.boss.x, this.boss.y, 18, 0x884422);
+      rock.setStrokeStyle(4, 0xcc6600);
+      this.physics.add.existing(rock);
+      rock.body.setAllowGravity(false);
+      rock.body.setCircle(18);
+
+      const speed = 120;
+      rock.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+
+      // Rotation du rocher
+      this.tweens.add({
+        targets: rock,
+        angle: 360,
+        duration: 1000,
+        repeat: -1
+      });
+
+      // Collision avec joueur
+      this.physics.add.overlap(this.player, rock, () => {
+        if (!this.isInvincible) {
+          this.takeDamage();
+          // Explosion du rocher
+          this.emitParticles(rock.x, rock.y, {
+            count: 15,
+            colors: [0x884422, 0x553311],
+            minSpeed: 80,
+            maxSpeed: 180,
+            minSize: 4,
+            maxSize: 10,
+            life: 400,
+            spread: Math.PI * 2,
+            fadeOut: true
+          });
+          rock.destroy();
+        }
+      });
+
+      // Auto-destruction après un temps
+      this.time.delayedCall(5000, () => {
+        if (rock.active) rock.destroy();
+      });
+    });
+  }
+
+  // ==========================================
+  // BOSS 7 : PHANTOM - Maître des illusions
+  // ==========================================
+  initBossPhantom() {
+    // PHANTOM crée des clones et se téléporte
+    this.boss.x = this.WORLD.width / 2;
+    this.boss.y = 200;
+    this.boss.setAlpha(0.8);
+    this.setBossTargetVelocity(0, 0);
+
+    // Clones actifs
+    this.phantomClones = [];
+    this.phantomRealIndex = 0; // Lequel est le vrai
+
+    // Timer de mouvement spectral
+    this.bossMoveTimer = this.time.addEvent({
+      delay: 1500,
+      callback: this.bossPhantomDrift,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer de téléportation
+    this.phantomTeleportTimer = this.time.addEvent({
+      delay: 3500,
+      callback: this.bossPhantomTeleport,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer de création de clones
+    this.bossShootTimer = this.time.addEvent({
+      delay: 5000,
+      callback: this.bossPhantomCreateClones,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer de tirs spectraux
+    this.phantomShootTimer = this.time.addEvent({
+      delay: 2000,
+      callback: this.bossPhantomShoot,
+      callbackScope: this,
+      loop: true
+    });
+  }
+
+  bossPhantomDrift() {
+    if (!this.boss || !this.boss.active) return;
+
+    // Mouvement imprévisible, comme un fantôme
+    const randAngle = Math.random() * Math.PI * 2;
+    const speed = this.boss.moveSpeed * 0.5;
+
+    this.setBossTargetVelocity(
+      Math.cos(randAngle) * speed,
+      Math.sin(randAngle) * speed * 0.5
+    );
+
+    // Garder dans la zone
+    if (this.boss.x < 150) this.setBossTargetVelocity(speed, this.boss.targetVelY);
+    if (this.boss.x > this.WORLD.width - 150) this.setBossTargetVelocity(-speed, this.boss.targetVelY);
+    if (this.boss.y < 120) this.setBossTargetVelocity(this.boss.targetVelX, speed * 0.5);
+    if (this.boss.y > 300) this.setBossTargetVelocity(this.boss.targetVelX, -speed * 0.5);
+  }
+
+  bossPhantomTeleport() {
+    if (!this.boss || !this.boss.active) return;
+
+    // Effet de disparition
+    this.tweens.add({
+      targets: this.boss,
+      alpha: 0,
+      scaleX: 0.5,
+      scaleY: 1.5,
+      duration: 300,
+      onComplete: () => {
+        if (!this.boss || !this.boss.active) return;
+
+        // Particules de disparition
+        this.emitParticles(this.boss.x, this.boss.y, {
+          count: 20,
+          colors: [0x9933ff, 0x6600aa, 0xcc66ff],
+          minSpeed: 80,
+          maxSpeed: 180,
+          minSize: 3,
+          maxSize: 8,
+          life: 400,
+          spread: Math.PI * 2,
+          fadeOut: true
+        });
+
+        // Nouvelle position (loin du joueur ou derrière)
+        const behindPlayer = this.player.x < this.WORLD.width / 2;
+        this.boss.x = behindPlayer ?
+          Phaser.Math.Between(this.WORLD.width / 2 + 100, this.WORLD.width - 150) :
+          Phaser.Math.Between(150, this.WORLD.width / 2 - 100);
+        this.boss.y = Phaser.Math.Between(150, 280);
+
+        // Effet de réapparition
+        this.emitParticles(this.boss.x, this.boss.y, {
+          count: 25,
+          colors: [0xcc66ff, 0x9933ff, 0xffffff],
+          minSpeed: 50,
+          maxSpeed: 120,
+          minSize: 2,
+          maxSize: 6,
+          life: 350,
+          spread: Math.PI * 2,
+          fadeOut: true
+        });
+
+        this.tweens.add({
+          targets: this.boss,
+          alpha: 0.8,
+          scaleX: 1,
+          scaleY: 1,
+          duration: 300
+        });
+      }
+    });
+  }
+
+  bossPhantomCreateClones() {
+    if (!this.boss || !this.boss.active) return;
+
+    // Détruire les anciens clones
+    this.phantomClones.forEach(c => {
+      if (c && c.active) {
+        this.emitParticles(c.x, c.y, {
+          count: 10,
+          colors: [0x9933ff, 0x6600aa],
+          minSpeed: 50,
+          maxSpeed: 100,
+          minSize: 2,
+          maxSize: 5,
+          life: 300,
+          spread: Math.PI * 2,
+          fadeOut: true
+        });
+        c.destroy();
+      }
+    });
+    this.phantomClones = [];
+
+    // Créer 2-3 clones en phase 2+
+    const numClones = this.bossPhase >= 2 ? 3 : 2;
+
+    // Flash pour signaler la création
+    this.cameras.main.flash(100, 150, 50, 200, false);
+
+    for (let i = 0; i < numClones; i++) {
+      this.time.delayedCall(i * 200, () => {
+        if (!this.boss || !this.boss.active) return;
+
+        const clone = this.add.ellipse(
+          this.boss.x + (Math.random() - 0.5) * 200,
+          this.boss.y + (Math.random() - 0.5) * 100,
+          28 * 0.8,
+          28,
+          0x6600aa,
+          0.5
+        );
+        clone.setStrokeStyle(2, 0x9933ff);
+        this.physics.add.existing(clone);
+        clone.body.setAllowGravity(false);
+        clone.isClone = true;
+        clone.health = 1;
+
+        // Animation d'apparition
+        clone.setAlpha(0);
+        clone.setScale(0);
+        this.tweens.add({
+          targets: clone,
+          alpha: 0.5,
+          scaleX: 1,
+          scaleY: 1,
+          duration: 300,
+          ease: 'Back.easeOut'
+        });
+
+        // Mouvement autonome du clone
+        clone.moveTimer = this.time.addEvent({
+          delay: 1000,
+          loop: true,
+          callback: () => {
+            if (!clone.active) return;
+            const angle = Math.random() * Math.PI * 2;
+            clone.body.setVelocity(
+              Math.cos(angle) * 60,
+              Math.sin(angle) * 40
+            );
+          }
+        });
+
+        // Tir du clone
+        clone.shootTimer = this.time.addEvent({
+          delay: 2500,
+          loop: true,
+          callback: () => {
+            if (!clone.active || !this.player) return;
+            const angle = Phaser.Math.Angle.Between(clone.x, clone.y, this.player.x, this.player.y);
+            this.createBossBullet(clone.x, clone.y, angle, 100);
+          }
+        });
+
+        this.phantomClones.push(clone);
+
+        // Collision avec le joueur (sauter dessus détruit le clone)
+        this.physics.add.overlap(this.player, clone, (p, c) => {
+          if (this.isInvincible) return;
+
+          if (p.body.velocity.y > 0 && p.y < c.y - 10) {
+            // Détruire le clone
+            this.playSound('enemyKill');
+            this.emitParticles(c.x, c.y, {
+              count: 15,
+              colors: [0x9933ff, 0x6600aa, 0xcc66ff],
+              minSpeed: 80,
+              maxSpeed: 180,
+              minSize: 3,
+              maxSize: 8,
+              life: 400,
+              spread: Math.PI * 2,
+              fadeOut: true
+            });
+            if (c.moveTimer) c.moveTimer.remove();
+            if (c.shootTimer) c.shootTimer.remove();
+            c.destroy();
+            this.phantomClones = this.phantomClones.filter(x => x.active);
+            p.body.setVelocityY(-300);
+          } else {
+            this.takeDamage();
+          }
+        });
+      });
+    }
+  }
+
+  bossPhantomShoot() {
+    if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+
+    // Tir spectral avec trajectoire courbe
+    const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
+
+    // Animation
+    this.tweens.add({
+      targets: this.boss,
+      alpha: 1,
+      duration: 100,
+      yoyo: true,
+      onYoyo: () => this.boss.setAlpha(0.8)
+    });
+
+    // Tir principal
+    this.createBossBullet(this.boss.x, this.boss.y, angle, 140);
+
+    // Phase 2+: tir en arc
+    if (this.bossPhase >= 2) {
+      this.time.delayedCall(150, () => {
+        if (this.boss && this.boss.active) {
+          this.createBossBullet(this.boss.x, this.boss.y, angle - 0.3, 130);
+          this.createBossBullet(this.boss.x, this.boss.y, angle + 0.3, 130);
+        }
+      });
+    }
+  }
+
+  // ==========================================
+  // BOSS 8 : BERSERKER - Rage incontrôlable
+  // ==========================================
+  initBossBerserker() {
+    // BERSERKER devient plus rapide et dangereux quand blessé
+    this.boss.x = this.WORLD.width / 2;
+    this.boss.y = 250;
+    this.setBossTargetVelocity(0, 0);
+
+    // État de rage
+    this.berserkerRage = 0; // 0-1, augmente avec les dégâts
+    this.berserkerCharging = false;
+
+    // Timer de mouvement agressif
+    this.bossMoveTimer = this.time.addEvent({
+      delay: 1800,
+      callback: this.bossBerserkerMove,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer de charge
+    this.bossShootTimer = this.time.addEvent({
+      delay: 3500,
+      callback: this.bossBerserkerCharge,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer de frappe au sol
+    this.berserkerSlamTimer = this.time.addEvent({
+      delay: 4500,
+      callback: this.bossBerserkerGroundSlam,
+      callbackScope: this,
+      loop: true
+    });
+  }
+
+  bossBerserkerMove() {
+    if (!this.boss || !this.boss.active || this.berserkerCharging) return;
+
+    // Calculer le niveau de rage basé sur la santé
+    this.berserkerRage = 1 - (this.bossHealth / this.bossMaxHealth);
+
+    const toPlayerX = this.player.x - this.boss.x;
+    const toPlayerY = this.player.y - this.boss.y;
+    const dist = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
+
+    // Vitesse augmente avec la rage
+    const baseSpeed = this.boss.moveSpeed;
+    const rageBonus = this.berserkerRage * 1.5;
+    const speed = baseSpeed * (1 + rageBonus);
+
+    // Mouvement agressif vers le joueur
+    this.setBossTargetVelocity(
+      (toPlayerX / dist) * speed,
+      (toPlayerY / dist) * speed * 0.5
+    );
+
+    // Garder dans les limites
+    const maxY = this.WORLD.groundY - 100;
+    if (this.boss.y > maxY) {
+      this.setBossTargetVelocity(this.boss.targetVelX, -speed * 0.5);
+    }
+    if (this.boss.y < 120) {
+      this.setBossTargetVelocity(this.boss.targetVelX, speed * 0.3);
+    }
+
+    // Effet visuel de rage
+    if (this.berserkerRage > 0.5) {
+      // Aura de rage plus intense
+      this.emitParticles(this.boss.x, this.boss.y, {
+        count: 2,
+        colors: [0xff0000, 0xff3300],
+        minSpeed: 50,
+        maxSpeed: 100,
+        minSize: 3,
+        maxSize: 6,
+        life: 300,
+        spread: Math.PI * 2,
+        fadeOut: true
+      });
+    }
+  }
+
+  bossBerserkerCharge() {
+    if (!this.boss || !this.boss.active || this.berserkerCharging) return;
+
+    this.berserkerCharging = true;
+
+    const toPlayerX = this.player.x - this.boss.x;
+    const toPlayerY = this.player.y - this.boss.y;
+    const dist = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
+
+    // Animation de préparation
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 0.8,
+      scaleY: 1.2,
+      duration: 500,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        if (!this.boss || !this.boss.active) return;
+
+        // CHARGE!
+        const chargeSpeed = 500 + this.berserkerRage * 300;
+        this.bossLunge(toPlayerX / dist, toPlayerY / dist * 0.3, chargeSpeed);
+
+        // Traînée de rage
+        for (let i = 0; i < 5; i++) {
+          this.time.delayedCall(i * 50, () => {
+            if (this.boss && this.boss.active) {
+              this.emitParticles(this.boss.x, this.boss.y, {
+                count: 5,
+                colors: [0xff0000, 0xff3300, 0xff6600],
+                minSpeed: 30,
+                maxSpeed: 80,
+                minSize: 4,
+                maxSize: 10,
+                life: 300,
+                spread: Math.PI,
+                angle: Math.atan2(-toPlayerY, -toPlayerX),
+                fadeOut: true
+              });
+            }
+          });
+        }
+
+        this.time.delayedCall(800, () => {
+          this.berserkerCharging = false;
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 200
+          });
+        });
+      }
+    });
+  }
+
+  bossBerserkerGroundSlam() {
+    if (!this.boss || !this.boss.active || this.berserkerCharging) return;
+
+    // Coup de poing au sol - crée une onde de feu
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.3,
+      scaleY: 0.7,
+      y: this.boss.y + 30,
+      duration: 300,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        if (!this.boss || !this.boss.active) return;
+
+        // Shake
+        this.cameras.main.shake(200, 0.02);
+
+        // Particules de frappe
+        this.emitParticles(this.boss.x, this.boss.y + 40, {
+          count: 25,
+          colors: [0xff0000, 0xff3300, 0xff6600, 0xffaa00],
+          minSpeed: 100,
+          maxSpeed: 250,
+          minSize: 4,
+          maxSize: 12,
+          life: 500,
+          angle: -Math.PI / 2,
+          spread: Math.PI * 0.7,
+          gravity: 200,
+          fadeOut: true
+        });
+
+        // Créer des projectiles en ligne au sol
+        const numProjectiles = 3 + Math.floor(this.berserkerRage * 3);
+        for (let i = 0; i < numProjectiles; i++) {
+          this.time.delayedCall(i * 100, () => {
+            if (this.boss && this.boss.active) {
+              // Projectile gauche
+              this.createBossBullet(this.boss.x - 30, this.boss.y + 30, Math.PI, 150 + i * 20);
+              // Projectile droite
+              this.createBossBullet(this.boss.x + 30, this.boss.y + 30, 0, 150 + i * 20);
+            }
+          });
+        }
+
+        // Retour à la normale
+        this.time.delayedCall(300, () => {
+          if (this.boss && this.boss.active) {
+            this.tweens.add({
+              targets: this.boss,
+              scaleX: 1,
+              scaleY: 1,
+              y: this.boss.y - 30,
+              duration: 400,
+              ease: 'Quad.easeOut'
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // ==========================================
+  // BOSS 9 : ARCHITECT - Maître de l'arène
+  // ==========================================
+  initBossArchitect() {
+    // ARCHITECT construit des obstacles et modifie l'arène
+    this.boss.x = this.WORLD.width / 2;
+    this.boss.y = 180;
+    this.setBossTargetVelocity(0, 0);
+
+    // Structures créées
+    this.architectStructures = [];
+    this.architectLasers = [];
+
+    // Timer de mouvement méthodique
+    this.bossMoveTimer = this.time.addEvent({
+      delay: 2000,
+      callback: this.bossArchitectMove,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer de construction
+    this.bossShootTimer = this.time.addEvent({
+      delay: 4000,
+      callback: this.bossArchitectBuild,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer de laser de scan
+    this.architectLaserTimer = this.time.addEvent({
+      delay: 3000,
+      callback: this.bossArchitectLaser,
+      callbackScope: this,
+      loop: true
+    });
+  }
+
+  bossArchitectMove() {
+    if (!this.boss || !this.boss.active) return;
+
+    // Mouvement précis et calculé - se positionne stratégiquement
+    const positions = [
+      { x: this.WORLD.width * 0.25, y: 180 },
+      { x: this.WORLD.width * 0.5, y: 160 },
+      { x: this.WORLD.width * 0.75, y: 180 },
+      { x: this.WORLD.width * 0.5, y: 220 }
+    ];
+
+    const target = positions[Math.floor(Math.random() * positions.length)];
+    const toTargetX = target.x - this.boss.x;
+    const toTargetY = target.y - this.boss.y;
+    const dist = Math.sqrt(toTargetX * toTargetX + toTargetY * toTargetY) || 1;
+    const speed = this.boss.moveSpeed * 0.4;
+
+    this.setBossTargetVelocity(
+      (toTargetX / dist) * speed,
+      (toTargetY / dist) * speed
+    );
+  }
+
+  bossArchitectBuild() {
+    if (!this.boss || !this.boss.active) return;
+
+    // Nettoyer les vieilles structures
+    this.architectStructures = this.architectStructures.filter(s => {
+      if (!s || !s.active) return false;
+      return true;
+    });
+
+    // Limiter le nombre de structures
+    if (this.architectStructures.length >= 4) {
+      // Détruire la plus ancienne
+      const oldest = this.architectStructures.shift();
+      if (oldest && oldest.active) {
+        this.emitParticles(oldest.x, oldest.y, {
+          count: 15,
+          colors: [0x00ff44, 0x00aa33],
+          minSpeed: 80,
+          maxSpeed: 150,
+          minSize: 3,
+          maxSize: 8,
+          life: 400,
+          spread: Math.PI * 2,
+          fadeOut: true
+        });
+        oldest.destroy();
+      }
+    }
+
+    // Animation de construction
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 0.9,
+      scaleY: 1.1,
+      duration: 300,
+      yoyo: true
+    });
+
+    // Construire un obstacle/tourelle
+    const buildX = Phaser.Math.Between(150, this.WORLD.width - 150);
+    const buildY = Phaser.Math.Between(200, this.WORLD.groundY - 150);
+
+    // Effet de construction
+    this.emitParticles(buildX, buildY, {
+      count: 20,
+      colors: [0x00ff44, 0x00ff00, 0xffffff],
+      minSpeed: 50,
+      maxSpeed: 120,
+      minSize: 2,
+      maxSize: 6,
+      life: 500,
+      spread: Math.PI * 2,
+      fadeOut: true
+    });
+
+    this.time.delayedCall(400, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      // Type de structure (tourelle ou mur)
+      const isTurret = Math.random() < 0.6;
+
+      if (isTurret) {
+        // Tourelle qui tire
+        const turret = this.add.polygon(buildX, buildY, [
+          -15, 15, 15, 15, 10, -10, 0, -20, -10, -10
+        ], 0x00aa44);
+        turret.setStrokeStyle(3, 0x00ff66);
+        this.physics.add.existing(turret, true); // Static
+
+        turret.isTurret = true;
+
+        // Timer de tir de la tourelle
+        turret.shootTimer = this.time.addEvent({
+          delay: 2000,
+          loop: true,
+          callback: () => {
+            if (!turret.active || !this.player) return;
+            const angle = Phaser.Math.Angle.Between(turret.x, turret.y, this.player.x, this.player.y);
+            this.createBossBullet(turret.x, turret.y - 15, angle, 120);
+
+            // Animation de tir
+            this.emitParticles(turret.x, turret.y - 15, {
+              count: 5,
+              colors: [0x00ff44, 0xffffff],
+              minSpeed: 40,
+              maxSpeed: 80,
+              minSize: 2,
+              maxSize: 4,
+              life: 200,
+              angle: angle,
+              spread: 0.5,
+              fadeOut: true
+            });
+          }
+        });
+
+        this.architectStructures.push(turret);
+
+        // Collision pour détruire la tourelle
+        this.physics.add.overlap(this.player, turret, (p, t) => {
+          if (p.body.velocity.y > 0 && p.y < t.y - 10) {
+            this.playSound('enemyKill');
+            this.emitParticles(t.x, t.y, {
+              count: 20,
+              colors: [0x00ff44, 0x00aa33, 0xffffff],
+              minSpeed: 100,
+              maxSpeed: 200,
+              minSize: 4,
+              maxSize: 10,
+              life: 400,
+              spread: Math.PI * 2,
+              fadeOut: true
+            });
+            if (t.shootTimer) t.shootTimer.remove();
+            t.destroy();
+            this.architectStructures = this.architectStructures.filter(s => s.active);
+            p.body.setVelocityY(-300);
+          }
+        });
+      } else {
+        // Mur/obstacle
+        const wall = this.add.rectangle(buildX, buildY, 60, 80, 0x006633);
+        wall.setStrokeStyle(3, 0x00ff66);
+        this.physics.add.existing(wall, true);
+
+        wall.isWall = true;
+
+        this.architectStructures.push(wall);
+
+        // Le mur disparaît après un temps
+        this.time.delayedCall(8000, () => {
+          if (wall.active) {
+            this.emitParticles(wall.x, wall.y, {
+              count: 15,
+              colors: [0x00ff44, 0x006633],
+              minSpeed: 60,
+              maxSpeed: 120,
+              minSize: 3,
+              maxSize: 8,
+              life: 400,
+              spread: Math.PI * 2,
+              fadeOut: true
+            });
+            wall.destroy();
+            this.architectStructures = this.architectStructures.filter(s => s.active);
+          }
+        });
+
+        // Collision physique avec le joueur
+        this.physics.add.collider(this.player, wall);
+      }
+    });
+  }
+
+  bossArchitectLaser() {
+    if (!this.boss || !this.boss.active) return;
+
+    // Laser de scan horizontal
+    const laserY = this.boss.y;
+
+    // Ligne de visée (warning)
+    const warning = this.add.rectangle(this.WORLD.width / 2, laserY, this.WORLD.width, 4, 0xff0000, 0.3);
+    warning.setDepth(25);
+
+    // Animation de warning
+    this.tweens.add({
+      targets: warning,
+      alpha: 0.6,
+      duration: 200,
+      yoyo: true,
+      repeat: 3,
+      onComplete: () => {
+        warning.destroy();
+
+        if (!this.boss || !this.boss.active) return;
+
+        // Tir du laser!
+        const laser = this.add.rectangle(this.WORLD.width / 2, laserY, this.WORLD.width, 12, 0x00ff00, 0.8);
+        laser.setStrokeStyle(2, 0xffffff);
+        laser.setDepth(26);
+
+        // Dégâts du laser
+        const checkDamage = this.time.addEvent({
+          delay: 50,
+          repeat: 5,
+          callback: () => {
+            if (!this.player || this.isInvincible) return;
+            if (Math.abs(this.player.y - laserY) < 20) {
+              this.takeDamage();
+            }
+          }
+        });
+
+        // Particules le long du laser
+        for (let i = 0; i < 10; i++) {
+          this.emitParticles(100 + i * 70, laserY, {
+            count: 3,
+            colors: [0x00ff00, 0x00ff44, 0xffffff],
+            minSpeed: 30,
+            maxSpeed: 80,
+            minSize: 2,
+            maxSize: 5,
+            life: 300,
+            spread: Math.PI * 2,
+            fadeOut: true
+          });
+        }
+
+        this.time.delayedCall(300, () => laser.destroy());
+      }
+    });
+  }
+
+  // ==========================================
+  // BOSS 10 : TWINS - Combat synchronisé
+  // ==========================================
+  initBossTwins() {
+    // TWINS: deux boss qui combattent ensemble
+    this.boss.x = this.WORLD.width / 2 - 80;
+    this.boss.y = 200;
+    this.setBossTargetVelocity(0, 0);
+
+    // Créer le deuxième jumeau
+    this.twin2 = this.add.circle(this.WORLD.width / 2 + 80, 200, 30, 0xff9900);
+    this.twin2.setStrokeStyle(3, 0xffcc00);
+    this.physics.add.existing(this.twin2);
+    this.twin2.body.setAllowGravity(false);
+    this.twin2.body.setCollideWorldBounds(true);
+    this.twin2.targetVelX = 0;
+    this.twin2.targetVelY = 0;
+    this.twin2.health = this.bossMaxHealth;
+    this.twin2.alive = true;
+
+    // Lien visuel entre les jumeaux
+    this.twinsLink = this.add.graphics();
+    this.twinsLink.setDepth(24);
+
+    // Timer de mouvement synchronisé
+    this.bossMoveTimer = this.time.addEvent({
+      delay: 1500,
+      callback: this.bossTwinsMove,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer d'attaque alternée
+    this.bossShootTimer = this.time.addEvent({
+      delay: 2000,
+      callback: this.bossTwinsAttack,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer d'attaque combinée
+    this.twinsComboTimer = this.time.addEvent({
+      delay: 5000,
+      callback: this.bossTwinsComboAttack,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Collision avec le twin2
+    this.physics.add.overlap(this.player, this.twin2, () => this.hitTwin2(), null, this);
+  }
+
+  bossTwinsMove() {
+    if (!this.boss || !this.boss.active) return;
+
+    const centerX = this.WORLD.width / 2;
+    const time = this.time.now;
+
+    // Mouvement orbital autour du centre
+    const orbitRadius = 120;
+    const orbitSpeed = 0.002;
+
+    // Twin 1 (orange agressif)
+    const angle1 = time * orbitSpeed;
+    const target1X = centerX + Math.cos(angle1) * orbitRadius;
+    const target1Y = 200 + Math.sin(angle1 * 2) * 50;
+
+    const toTarget1X = target1X - this.boss.x;
+    const toTarget1Y = target1Y - this.boss.y;
+    this.setBossTargetVelocity(toTarget1X * 0.1, toTarget1Y * 0.1);
+
+    // Twin 2 (bleu défensif) - opposé
+    if (this.twin2 && this.twin2.alive) {
+      const angle2 = time * orbitSpeed + Math.PI;
+      const target2X = centerX + Math.cos(angle2) * orbitRadius;
+      const target2Y = 200 + Math.sin(angle2 * 2) * 50;
+
+      const toTarget2X = target2X - this.twin2.x;
+      const toTarget2Y = target2Y - this.twin2.y;
+      this.twin2.targetVelX = toTarget2X * 0.1;
+      this.twin2.targetVelY = toTarget2Y * 0.1;
+
+      // Appliquer le mouvement au twin2
+      const diffX = this.twin2.targetVelX - this.twin2.body.velocity.x;
+      const diffY = this.twin2.targetVelY - this.twin2.body.velocity.y;
+      this.twin2.body.velocity.x += diffX * 0.05;
+      this.twin2.body.velocity.y += diffY * 0.05;
+    }
+
+    // Mettre à jour le lien visuel
+    this.updateTwinsLink();
+  }
+
+  updateTwinsLink() {
+    if (!this.twinsLink || !this.boss || !this.boss.active) return;
+
+    this.twinsLink.clear();
+
+    if (this.twin2 && this.twin2.alive) {
+      // Dessiner le lien entre les jumeaux
+      this.twinsLink.lineStyle(4, 0xffff00, 0.6);
+      this.twinsLink.beginPath();
+      this.twinsLink.moveTo(this.boss.x, this.boss.y);
+      this.twinsLink.lineTo(this.twin2.x, this.twin2.y);
+      this.twinsLink.strokePath();
+
+      // Points d'énergie sur le lien
+      const midX = (this.boss.x + this.twin2.x) / 2;
+      const midY = (this.boss.y + this.twin2.y) / 2;
+      this.twinsLink.fillStyle(0xffff00, 0.8);
+      this.twinsLink.fillCircle(midX, midY, 6 + Math.sin(this.time.now * 0.01) * 2);
+    }
+  }
+
+  bossTwinsAttack() {
+    if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+
+    // Attaque alternée entre les jumeaux
+    const twin1Turn = Math.random() < 0.5;
+
+    if (twin1Turn || !this.twin2 || !this.twin2.alive) {
+      // Twin 1 attaque (burst rapide)
+      const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
+      for (let i = 0; i < 3; i++) {
+        this.time.delayedCall(i * 100, () => {
+          if (this.boss && this.boss.active) {
+            this.createBossBullet(this.boss.x, this.boss.y, angle + (Math.random() - 0.5) * 0.2, 160);
+          }
+        });
+      }
+    } else {
+      // Twin 2 attaque (tir défensif en cercle)
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        this.createBossBullet(this.twin2.x, this.twin2.y, angle, 100);
+      }
+    }
+  }
+
+  bossTwinsComboAttack() {
+    if (!this.boss || !this.boss.active) return;
+    if (!this.twin2 || !this.twin2.alive) return;
+
+    // Attaque combinée: les deux jumeaux tirent vers le joueur en même temps
+    // avec un laser sur le lien
+
+    // Animation de charge
+    this.tweens.add({
+      targets: [this.boss, this.twin2],
+      scaleX: 1.2,
+      scaleY: 1.2,
+      duration: 400,
+      yoyo: true
+    });
+
+    this.time.delayedCall(500, () => {
+      if (!this.boss || !this.boss.active) return;
+      if (!this.twin2 || !this.twin2.alive) return;
+
+      // Laser sur le lien
+      const linkGraphics = this.add.graphics();
+      linkGraphics.setDepth(27);
+      linkGraphics.lineStyle(15, 0xffff00, 0.8);
+      linkGraphics.beginPath();
+      linkGraphics.moveTo(this.boss.x, this.boss.y);
+      linkGraphics.lineTo(this.twin2.x, this.twin2.y);
+      linkGraphics.strokePath();
+
+      // Vérifier si le joueur est touché par le lien
+      const linkDamage = this.time.addEvent({
+        delay: 50,
+        repeat: 6,
+        callback: () => {
+          if (!this.player || this.isInvincible) return;
+          // Vérifier la distance du joueur à la ligne
+          const dist = this.pointToLineDistance(
+            this.player.x, this.player.y,
+            this.boss.x, this.boss.y,
+            this.twin2.x, this.twin2.y
+          );
+          if (dist < 25) {
+            this.takeDamage();
+          }
+        }
+      });
+
+      this.time.delayedCall(350, () => linkGraphics.destroy());
+
+      // Tirs simultanés
+      const angle1 = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
+      const angle2 = Phaser.Math.Angle.Between(this.twin2.x, this.twin2.y, this.player.x, this.player.y);
+
+      this.createBossBullet(this.boss.x, this.boss.y, angle1, 180);
+      this.createBossBullet(this.twin2.x, this.twin2.y, angle2, 180);
+    });
+  }
+
+  pointToLineDistance(px, py, x1, y1, x2, y2) {
+    const A = px - x1;
+    const B = py - y1;
+    const C = x2 - x1;
+    const D = y2 - y1;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    let param = -1;
+    if (lenSq !== 0) param = dot / lenSq;
+
+    let xx, yy;
+    if (param < 0) {
+      xx = x1;
+      yy = y1;
+    } else if (param > 1) {
+      xx = x2;
+      yy = y2;
+    } else {
+      xx = x1 + param * C;
+      yy = y1 + param * D;
+    }
+
+    const dx = px - xx;
+    const dy = py - yy;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  hitTwin2() {
+    if (this.isInvincible || !this.twin2 || !this.twin2.alive) return;
+
+    if (this.player.body.velocity.y > 0 && this.player.y < this.twin2.y - 10) {
+      // Dégâts au twin2
+      this.twin2.health--;
+      this.player.body.setVelocityY(-350);
+
+      // Effet de dégât
+      this.emitParticles(this.twin2.x, this.twin2.y, {
+        count: 15,
+        colors: [0xff9900, 0xffcc00, 0xffffff],
+        minSpeed: 80,
+        maxSpeed: 180,
+        minSize: 3,
+        maxSize: 8,
+        life: 400,
+        spread: Math.PI * 2,
+        fadeOut: true
+      });
+
+      this.tweens.add({
+        targets: this.twin2,
+        alpha: 0.3,
+        duration: 100,
+        yoyo: true,
+        repeat: 3
+      });
+
+      // Vérifier si twin2 est mort
+      if (this.twin2.health <= 0) {
+        this.twin2.alive = false;
+
+        // Mort du twin2
+        this.emitParticles(this.twin2.x, this.twin2.y, {
+          count: 40,
+          colors: [0xff9900, 0xffcc00, 0xffffff],
+          minSpeed: 100,
+          maxSpeed: 250,
+          minSize: 4,
+          maxSize: 12,
+          life: 600,
+          spread: Math.PI * 2,
+          fadeOut: true
+        });
+
+        this.playSound('bossHit');
+        this.twin2.destroy();
+
+        // Le boss restant devient enragé
+        this.boss.moveSpeed *= 1.5;
+        this.bossShootTimer.delay = 1500;
+      }
     } else {
       this.takeDamage();
     }
@@ -6582,6 +9472,9 @@ class GameScene extends Phaser.Scene {
 
     // Mise à jour IA des shooters
     this.updateShooterAI(delta);
+
+    // Mise à jour physique du boss (mouvement réaliste)
+    this.updateBossPhysics(delta);
 
     // Mise à jour des visuels du boss
     this.updateBossVisuals(delta);
