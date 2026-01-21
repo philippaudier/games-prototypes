@@ -3,25 +3,68 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>proto-001-2d-platformer</title>
+  <title>Neon Platformer</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      background: #1a1a2e;
+      background: #050510;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
       overflow: hidden;
+      font-family: 'Segoe UI', system-ui, sans-serif;
     }
     #game {
-      border: 2px solid #4a4a6a;
+      border-radius: 8px;
+      box-shadow:
+        0 0 20px rgba(0, 255, 136, 0.15),
+        0 0 60px rgba(0, 255, 136, 0.05),
+        inset 0 0 60px rgba(0, 0, 0, 0.3);
+    }
+    #game canvas {
+      border-radius: 8px;
+    }
+    /* Instructions overlay */
+    #controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px 20px;
+      border-radius: 20px;
+      color: #888;
+      font-size: 12px;
+      pointer-events: none;
+      opacity: 0.8;
+      transition: opacity 0.3s;
+    }
+    #controls:hover {
+      opacity: 1;
+    }
+    #controls span {
+      margin: 0 10px;
+    }
+    #controls .key {
+      background: #333;
+      padding: 2px 8px;
       border-radius: 4px;
+      color: #0f8;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
   <div id="game"></div>
+  <div id="controls">
+    <span><span class="key">←→</span> Move</span>
+    <span><span class="key">Z</span> Jump</span>
+    <span><span class="key">SHIFT</span> Dash</span>
+    <span><span class="key">↓</span> Fast Fall</span>
+    <span><span class="key">F</span> Fullscreen</span>
+    <span><span class="key">R</span> Reset</span>
+  </div>
   <script type="module" src="./main.js"></script>
 </body>
 </html>
