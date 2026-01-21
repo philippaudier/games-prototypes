@@ -7,9 +7,25 @@ class GameScene extends Phaser.Scene {
 
   init(data) {
     this.currentRoom = data.room || 'start';
-    this.inventory = data.inventory || [];
     this.playerAngle = data.playerAngle || -90; // Face up by default
     this.zombiesKilled = data.zombiesKilled || [];
+
+    // Inventory system - array of item objects
+    this.inventory = data.inventory || [];
+    this.inventorySize = 8; // Max 8 slots
+    this.inventoryOpen = false;
+    this.selectedSlot = 0;
+
+    // Item database
+    this.itemDatabase = {
+      'redKey': { name: 'Red Key', type: 'key', description: 'An old red key. Opens red doors.', icon: '🔑', color: 0xff4444 },
+      'blueKey': { name: 'Blue Key', type: 'key', description: 'A blue key with strange markings.', icon: '🔑', color: 0x4444ff },
+      'ammo1': { name: 'Handgun Ammo', type: 'ammo', description: 'Standard 9mm rounds. x6', icon: '🔫', color: 0xcccccc, ammoCount: 6 },
+      'ammo2': { name: 'Handgun Ammo', type: 'ammo', description: 'Standard 9mm rounds. x6', icon: '🔫', color: 0xcccccc, ammoCount: 6 },
+      'herb1': { name: 'Green Herb', type: 'herb', description: 'A medicinal herb. Restores health.', icon: '🌿', color: 0x44aa44, healAmount: 30 },
+      'herb2': { name: 'Green Herb', type: 'herb', description: 'A medicinal herb. Restores health.', icon: '🌿', color: 0x44aa44, healAmount: 30 },
+      'firstAid': { name: 'First Aid Spray', type: 'healing', description: 'Fully restores health.', icon: '💊', color: 0x44aaaa, healAmount: 100 }
+    };
   }
 
   create() {
@@ -439,8 +455,14 @@ class GameScene extends Phaser.Scene {
       d: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D), // Turn right
       space: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
       x: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X),
-      shift: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT)
+      shift: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
+      i: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I), // Inventory
+      tab: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TAB), // Inventory alt
+      esc: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC) // Close inventory
     };
+
+    // Prevent TAB from changing focus
+    this.input.keyboard.addCapture(Phaser.Input.Keyboard.KeyCodes.TAB);
   }
 
   initTouchControls() {
@@ -453,7 +475,9 @@ class GameScene extends Phaser.Scene {
       actionJustPressed: false,
       shoot: false,
       shootJustPressed: false,
-      run: false
+      run: false,
+      inventory: false,
+      inventoryJustPressed: false
     };
 
     const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -474,6 +498,9 @@ class GameScene extends Phaser.Scene {
         } else if (input === 'shoot') {
           this.touchInput.shoot = true;
           this.touchInput.shootJustPressed = true;
+        } else if (input === 'inventory') {
+          this.touchInput.inventory = true;
+          this.touchInput.inventoryJustPressed = true;
         } else {
           this.touchInput[input] = true;
         }
@@ -487,6 +514,8 @@ class GameScene extends Phaser.Scene {
           this.touchInput.action = false;
         } else if (input === 'shoot') {
           this.touchInput.shoot = false;
+        } else if (input === 'inventory') {
+          this.touchInput.inventory = false;
         } else {
           this.touchInput[input] = false;
         }
@@ -503,6 +532,7 @@ class GameScene extends Phaser.Scene {
     if (this.touchInput) {
       this.touchInput.actionJustPressed = false;
       this.touchInput.shootJustPressed = false;
+      this.touchInput.inventoryJustPressed = false;
     }
   }
 
@@ -523,15 +553,15 @@ class GameScene extends Phaser.Scene {
       fill: '#aaa'
     }).setOrigin(1, 0).setDepth(200);
 
-    // Inventory display
-    this.inventoryText = this.add.text(20, this.WORLD.height - 60, '', {
-      fontSize: '12px',
+    // Inventory hint
+    this.invHintText = this.add.text(20, this.WORLD.height - 25, '[TAB] Inventory', {
+      fontSize: '11px',
       fontFamily: 'monospace',
-      fill: '#888'
+      fill: '#555'
     }).setDepth(200);
 
     // Message display
-    this.messageText = this.add.text(this.WORLD.width / 2, this.WORLD.height - 30, '', {
+    this.messageText = this.add.text(this.WORLD.width / 2, this.WORLD.height - 50, '', {
       fontSize: '14px',
       fontFamily: 'monospace',
       fill: '#ddd',
@@ -539,7 +569,124 @@ class GameScene extends Phaser.Scene {
       padding: { x: 10, y: 5 }
     }).setOrigin(0.5).setDepth(200).setAlpha(0);
 
+    // Create inventory UI (hidden by default)
+    this.createInventoryUI();
+
     this.updateUI();
+  }
+
+  createInventoryUI() {
+    // Inventory container
+    this.invContainer = this.add.container(this.WORLD.width / 2, this.WORLD.height / 2);
+    this.invContainer.setDepth(500);
+    this.invContainer.setVisible(false);
+
+    // Background overlay
+    this.invOverlay = this.add.rectangle(0, 0, this.WORLD.width, this.WORLD.height, 0x000000, 0.85);
+    this.invContainer.add(this.invOverlay);
+
+    // Inventory panel
+    const panelW = 400;
+    const panelH = 280;
+    this.invPanel = this.add.rectangle(0, 0, panelW, panelH, 0x1a1512);
+    this.invPanel.setStrokeStyle(3, 0x8b4513);
+    this.invContainer.add(this.invPanel);
+
+    // Title
+    this.invTitle = this.add.text(0, -panelH/2 + 20, 'INVENTORY', {
+      fontSize: '20px',
+      fontFamily: 'serif',
+      fill: '#c4a060',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    this.invContainer.add(this.invTitle);
+
+    // Slots grid (2 rows x 4 cols)
+    this.invSlots = [];
+    this.invSlotGraphics = [];
+    const slotSize = 60;
+    const startX = -1.5 * (slotSize + 10);
+    const startY = -30;
+
+    for (let i = 0; i < this.inventorySize; i++) {
+      const row = Math.floor(i / 4);
+      const col = i % 4;
+      const x = startX + col * (slotSize + 10);
+      const y = startY + row * (slotSize + 10);
+
+      // Slot background
+      const slot = this.add.rectangle(x, y, slotSize, slotSize, 0x2a2018);
+      slot.setStrokeStyle(2, 0x4a3828);
+      slot.slotIndex = i;
+      slot.setInteractive();
+      this.invContainer.add(slot);
+      this.invSlots.push(slot);
+
+      // Item icon (will be updated)
+      const icon = this.add.text(x, y, '', {
+        fontSize: '28px'
+      }).setOrigin(0.5);
+      this.invContainer.add(icon);
+      this.invSlotGraphics.push(icon);
+
+      // Click handler
+      slot.on('pointerdown', () => {
+        this.selectedSlot = i;
+        this.updateInventoryUI();
+      });
+    }
+
+    // Selected item info panel
+    this.invInfoBg = this.add.rectangle(0, panelH/2 - 50, panelW - 40, 60, 0x0a0805);
+    this.invInfoBg.setStrokeStyle(1, 0x3a2818);
+    this.invContainer.add(this.invInfoBg);
+
+    this.invItemName = this.add.text(-panelW/2 + 30, panelH/2 - 70, '', {
+      fontSize: '14px',
+      fontFamily: 'monospace',
+      fill: '#c4a060',
+      fontStyle: 'bold'
+    });
+    this.invContainer.add(this.invItemName);
+
+    this.invItemDesc = this.add.text(-panelW/2 + 30, panelH/2 - 50, '', {
+      fontSize: '11px',
+      fontFamily: 'monospace',
+      fill: '#888',
+      wordWrap: { width: panelW - 60 }
+    });
+    this.invContainer.add(this.invItemDesc);
+
+    // Action buttons
+    this.invUseBtn = this.add.text(panelW/2 - 80, panelH/2 - 65, '[SPACE] Use', {
+      fontSize: '12px',
+      fontFamily: 'monospace',
+      fill: '#6a6',
+      backgroundColor: '#1a2a1a',
+      padding: { x: 8, y: 4 }
+    }).setOrigin(0.5).setInteractive();
+    this.invContainer.add(this.invUseBtn);
+
+    this.invDropBtn = this.add.text(panelW/2 - 80, panelH/2 - 40, '[X] Drop', {
+      fontSize: '12px',
+      fontFamily: 'monospace',
+      fill: '#a66',
+      backgroundColor: '#2a1a1a',
+      padding: { x: 8, y: 4 }
+    }).setOrigin(0.5).setInteractive();
+    this.invContainer.add(this.invDropBtn);
+
+    // Button click handlers
+    this.invUseBtn.on('pointerdown', () => this.useSelectedItem());
+    this.invDropBtn.on('pointerdown', () => this.dropSelectedItem());
+
+    // Close hint
+    this.invCloseHint = this.add.text(0, -panelH/2 + 45, 'Press TAB or ESC to close', {
+      fontSize: '10px',
+      fontFamily: 'monospace',
+      fill: '#555'
+    }).setOrigin(0.5);
+    this.invContainer.add(this.invCloseHint);
   }
 
   updateUI() {
@@ -553,15 +700,139 @@ class GameScene extends Phaser.Scene {
 
     // Ammo
     this.ammoText.setText(`AMMO: ${this.playerAmmo}`);
+  }
 
-    // Inventory
-    const invItems = this.inventory.map(id => {
-      if (id.includes('Key')) return '🔑';
-      if (id.includes('ammo')) return '🔫';
-      if (id.includes('herb')) return '🌿';
-      return '📦';
-    }).join(' ');
-    this.inventoryText.setText(invItems || '');
+  updateInventoryUI() {
+    // Update slot visuals
+    for (let i = 0; i < this.inventorySize; i++) {
+      const slot = this.invSlots[i];
+      const icon = this.invSlotGraphics[i];
+      const itemId = this.inventory[i];
+
+      if (itemId && this.itemDatabase[itemId]) {
+        const item = this.itemDatabase[itemId];
+        icon.setText(item.icon);
+        slot.setFillStyle(0x3a3020);
+      } else {
+        icon.setText('');
+        slot.setFillStyle(0x2a2018);
+      }
+
+      // Highlight selected slot
+      if (i === this.selectedSlot) {
+        slot.setStrokeStyle(3, 0xc4a060);
+      } else {
+        slot.setStrokeStyle(2, 0x4a3828);
+      }
+    }
+
+    // Update info panel
+    const selectedItemId = this.inventory[this.selectedSlot];
+    if (selectedItemId && this.itemDatabase[selectedItemId]) {
+      const item = this.itemDatabase[selectedItemId];
+      this.invItemName.setText(item.name);
+      this.invItemDesc.setText(item.description);
+      this.invUseBtn.setVisible(item.type === 'herb' || item.type === 'healing' || item.type === 'ammo');
+      this.invDropBtn.setVisible(true);
+    } else {
+      this.invItemName.setText('Empty Slot');
+      this.invItemDesc.setText('Select an item to see details.');
+      this.invUseBtn.setVisible(false);
+      this.invDropBtn.setVisible(false);
+    }
+  }
+
+  openInventory() {
+    if (this.isTransitioning) return;
+    this.inventoryOpen = true;
+    this.canMove = false;
+    this.invContainer.setVisible(true);
+    this.updateInventoryUI();
+  }
+
+  closeInventory() {
+    this.inventoryOpen = false;
+    this.canMove = true;
+    this.invContainer.setVisible(false);
+  }
+
+  toggleInventory() {
+    if (this.inventoryOpen) {
+      this.closeInventory();
+    } else {
+      this.openInventory();
+    }
+  }
+
+  useSelectedItem() {
+    const itemId = this.inventory[this.selectedSlot];
+    if (!itemId) return;
+
+    const item = this.itemDatabase[itemId];
+    if (!item) return;
+
+    if (item.type === 'herb' || item.type === 'healing') {
+      // Heal player
+      const oldHealth = this.playerHealth;
+      this.playerHealth = Math.min(100, this.playerHealth + item.healAmount);
+      const healed = this.playerHealth - oldHealth;
+
+      // Remove item from inventory
+      this.inventory.splice(this.selectedSlot, 1);
+
+      this.showMessage(`Used ${item.name}. Restored ${healed} health.`);
+      this.updateUI();
+      this.updateInventoryUI();
+
+      // Visual feedback
+      this.cameras.main.flash(300, 0, 100, 0, true);
+    } else if (item.type === 'ammo') {
+      // Add ammo
+      this.playerAmmo += item.ammoCount || 6;
+
+      // Remove item from inventory
+      this.inventory.splice(this.selectedSlot, 1);
+
+      this.showMessage(`Loaded ${item.ammoCount || 6} rounds.`);
+      this.updateUI();
+      this.updateInventoryUI();
+    }
+
+    // Adjust selected slot if needed
+    if (this.selectedSlot >= this.inventory.length && this.selectedSlot > 0) {
+      this.selectedSlot = this.inventory.length - 1;
+    }
+  }
+
+  dropSelectedItem() {
+    const itemId = this.inventory[this.selectedSlot];
+    if (!itemId) return;
+
+    const item = this.itemDatabase[itemId];
+
+    // Remove from inventory
+    this.inventory.splice(this.selectedSlot, 1);
+
+    this.showMessage(`Dropped ${item.name}.`);
+    this.updateInventoryUI();
+
+    // Adjust selected slot
+    if (this.selectedSlot >= this.inventory.length && this.selectedSlot > 0) {
+      this.selectedSlot = this.inventory.length - 1;
+    }
+  }
+
+  navigateInventory(direction) {
+    if (direction === 'left') {
+      this.selectedSlot = (this.selectedSlot - 1 + this.inventorySize) % this.inventorySize;
+    } else if (direction === 'right') {
+      this.selectedSlot = (this.selectedSlot + 1) % this.inventorySize;
+    } else if (direction === 'up') {
+      this.selectedSlot = (this.selectedSlot - 4 + this.inventorySize) % this.inventorySize;
+    } else if (direction === 'down') {
+      this.selectedSlot = (this.selectedSlot + 4) % this.inventorySize;
+    }
+    this.updateInventoryUI();
   }
 
   showMessage(text, duration = 2000) {
@@ -626,6 +897,12 @@ class GameScene extends Phaser.Scene {
                           (this.touchInput && this.touchInput.actionJustPressed);
 
     if (!actionPressed) return;
+
+    // Check if inventory is full
+    if (this.inventory.length >= this.inventorySize) {
+      this.showMessage("Inventory is full!");
+      return;
+    }
 
     const data = item.itemData;
     this.inventory.push(data.id);
@@ -759,9 +1036,57 @@ class GameScene extends Phaser.Scene {
   // ==========================================
 
   update(time, delta) {
-    if (!this.player || !this.canMove || this.isTransitioning) return;
+    if (!this.player || this.isTransitioning) return;
 
     const touch = this.touchInput || {};
+
+    // Inventory toggle (TAB, I, or ESC to close)
+    const invTogglePressed = Phaser.Input.Keyboard.JustDown(this.keys.tab) ||
+                             Phaser.Input.Keyboard.JustDown(this.keys.i) ||
+                             touch.inventoryJustPressed;
+    const escPressed = Phaser.Input.Keyboard.JustDown(this.keys.esc);
+
+    if (invTogglePressed) {
+      this.toggleInventory();
+    } else if (escPressed && this.inventoryOpen) {
+      this.closeInventory();
+    }
+
+    // Handle inventory navigation when open
+    if (this.inventoryOpen) {
+      // Navigate with arrows or ZQSD
+      if (Phaser.Input.Keyboard.JustDown(this.cursors.left) || Phaser.Input.Keyboard.JustDown(this.keys.q)) {
+        this.navigateInventory('left');
+      }
+      if (Phaser.Input.Keyboard.JustDown(this.cursors.right) || Phaser.Input.Keyboard.JustDown(this.keys.d)) {
+        this.navigateInventory('right');
+      }
+      if (Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.keys.z)) {
+        this.navigateInventory('up');
+      }
+      if (Phaser.Input.Keyboard.JustDown(this.cursors.down) || Phaser.Input.Keyboard.JustDown(this.keys.s)) {
+        this.navigateInventory('down');
+      }
+
+      // Use item with SPACE
+      if (Phaser.Input.Keyboard.JustDown(this.keys.space) || touch.actionJustPressed) {
+        this.useSelectedItem();
+      }
+
+      // Drop item with X
+      if (Phaser.Input.Keyboard.JustDown(this.keys.x) || touch.shootJustPressed) {
+        this.dropSelectedItem();
+      }
+
+      this.resetTouchJustPressed();
+      return; // Don't process movement when inventory is open
+    }
+
+    // Normal gameplay when inventory is closed
+    if (!this.canMove) {
+      this.resetTouchJustPressed();
+      return;
+    }
 
     // Tank controls (AZERTY: Z=forward, S=backward, Q=turn left, D=turn right)
     const forward = this.cursors.up.isDown || this.keys.z.isDown || touch.forward;
