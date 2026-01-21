@@ -853,80 +853,99 @@ class GameScene extends Phaser.Scene {
   // ==========================================
 
   createLighting() {
-    // Use a simple graphics overlay instead of RenderTexture for proper scaling
-    this.darkness = this.add.graphics();
+    // Create darkness as a simple black rectangle
+    this.darkness = this.add.rectangle(
+      this.WORLD.width / 2,
+      this.WORLD.height / 2,
+      this.WORLD.width,
+      this.WORLD.height,
+      0x000000
+    );
     this.darkness.setDepth(100);
+    this.darkness.setAlpha(0.85);
+
+    // Create light cone as a graphics object with MULTIPLY blend to "cut through" darkness
+    this.lightCone = this.add.graphics();
+    this.lightCone.setDepth(99); // Just below darkness
   }
 
   updateLighting() {
-    const graphics = this.darkness;
-    graphics.clear();
-
     const px = this.player.x;
     const py = this.player.y;
-    const w = this.WORLD.width;
-    const h = this.WORLD.height;
 
-    // Flashlight parameters
-    const angle = this.player.rotation - Math.PI / 2;
-    const range = this.config.flashlightRange;
-    const spread = Phaser.Math.DegToRad(this.config.flashlightAngle);
-    const segments = 24;
-    const darknessAlpha = this.flashlightOn ? 0.85 : 0.95;
+    // Update darkness alpha
+    this.darkness.setAlpha(this.flashlightOn ? 0.85 : 0.95);
 
-    // Build the light cone points
-    const conePoints = [];
+    // Clear and redraw light cone
+    this.lightCone.clear();
+
     if (this.flashlightOn) {
-      conePoints.push({ x: px, y: py });
+      const angle = this.player.rotation - Math.PI / 2;
+      const range = this.config.flashlightRange;
+      const spread = Phaser.Math.DegToRad(this.config.flashlightAngle);
+      const segments = 24;
+
+      // Draw bright cone (will show through darkness via mask)
+      this.lightCone.fillStyle(0xffffcc, 0.3);
+      this.lightCone.beginPath();
+      this.lightCone.moveTo(px, py);
       for (let i = 0; i <= segments; i++) {
         const a = angle - spread + (spread * 2 * i / segments);
-        conePoints.push({
-          x: px + Math.cos(a) * range,
-          y: py + Math.sin(a) * range
-        });
+        this.lightCone.lineTo(
+          px + Math.cos(a) * range,
+          py + Math.sin(a) * range
+        );
       }
-    }
+      this.lightCone.closePath();
+      this.lightCone.fillPath();
 
-    // Draw darkness with hole for flashlight using path winding
-    graphics.fillStyle(0x000000, darknessAlpha);
+      // Ambient glow
+      this.lightCone.fillStyle(0xffffcc, 0.2);
+      this.lightCone.fillCircle(px, py, 50);
 
-    // Outer rectangle (clockwise)
-    graphics.beginPath();
-    graphics.moveTo(0, 0);
-    graphics.lineTo(w, 0);
-    graphics.lineTo(w, h);
-    graphics.lineTo(0, h);
-    graphics.lineTo(0, 0);
-
-    // Inner cone hole (counter-clockwise to create hole)
-    if (this.flashlightOn && conePoints.length > 0) {
-      // Add ambient circle first (approximate with polygon)
-      const ambientRadius = 40;
-      const ambientSegments = 16;
-      graphics.moveTo(px + ambientRadius, py);
-      for (let i = ambientSegments; i >= 0; i--) {
-        const a = (i / ambientSegments) * Math.PI * 2;
-        graphics.lineTo(px + Math.cos(a) * ambientRadius, py + Math.sin(a) * ambientRadius);
-      }
-
-      // Add cone hole (counter-clockwise)
-      graphics.moveTo(conePoints[conePoints.length - 1].x, conePoints[conePoints.length - 1].y);
-      for (let i = conePoints.length - 2; i >= 0; i--) {
-        graphics.lineTo(conePoints[i].x, conePoints[i].y);
-      }
+      // Now create a mask from the light shape to cut the darkness
+      // We'll use alpha on darkness where light hits
+      this.updateDarknessMask(px, py, angle, range, spread, segments);
     } else {
-      // Small ambient only when flashlight off
-      const ambientRadius = 18;
-      const ambientSegments = 12;
-      graphics.moveTo(px + ambientRadius, py);
-      for (let i = ambientSegments; i >= 0; i--) {
-        const a = (i / ambientSegments) * Math.PI * 2;
-        graphics.lineTo(px + Math.cos(a) * ambientRadius, py + Math.sin(a) * ambientRadius);
-      }
+      // Small ambient only
+      this.lightCone.fillStyle(0xffffcc, 0.15);
+      this.lightCone.fillCircle(px, py, 25);
+      this.darkness.setAlpha(0.95);
+    }
+  }
+
+  updateDarknessMask(px, py, angle, range, spread, segments) {
+    // Create geometry mask from light cone
+    if (this.darknessMask) {
+      this.darknessMask.destroy();
     }
 
-    graphics.closePath();
-    graphics.fillPath();
+    const maskGraphics = this.make.graphics();
+
+    // Fill entire screen
+    maskGraphics.fillStyle(0xffffff);
+    maskGraphics.fillRect(0, 0, this.WORLD.width, this.WORLD.height);
+
+    // Cut out cone (black = transparent in mask)
+    maskGraphics.fillStyle(0x000000);
+    maskGraphics.beginPath();
+    maskGraphics.moveTo(px, py);
+    for (let i = 0; i <= segments; i++) {
+      const a = angle - spread + (spread * 2 * i / segments);
+      maskGraphics.lineTo(
+        px + Math.cos(a) * range,
+        py + Math.sin(a) * range
+      );
+    }
+    maskGraphics.closePath();
+    maskGraphics.fillPath();
+
+    // Cut out ambient circle
+    maskGraphics.fillCircle(px, py, 50);
+
+    // Apply mask to darkness
+    this.darknessMask = maskGraphics.createGeometryMask();
+    this.darkness.setMask(this.darknessMask);
   }
 
   toggleFlashlight() {
