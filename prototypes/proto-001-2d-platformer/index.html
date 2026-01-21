@@ -14,7 +14,7 @@
     html, body {
       width: 100%;
       height: 100%;
-      height: 100dvh; /* Dynamic viewport height - handles mobile address bar */
+      height: 100dvh;
       overflow: hidden;
       touch-action: none;
       -webkit-touch-callout: none;
@@ -31,19 +31,30 @@
       align-items: center;
       font-family: 'Segoe UI', system-ui, sans-serif;
     }
+
+    /* Main game container - flex layout for mobile */
+    #game-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+    }
+
     #game {
       border-radius: 8px;
       box-shadow:
         0 0 20px rgba(0, 255, 136, 0.15),
         0 0 60px rgba(0, 255, 136, 0.05),
         inset 0 0 60px rgba(0, 0, 0, 0.3);
+      flex-shrink: 0;
     }
     #game canvas {
       border-radius: 8px;
       display: block;
     }
 
-    /* Start screen overlay - needed for fullscreen on mobile */
+    /* Start screen overlay */
     #start-screen {
       display: none;
       position: fixed;
@@ -85,7 +96,8 @@
       display: none;
       position: fixed;
       top: 10px;
-      right: 10px;
+      left: 50%;
+      transform: translateX(-50%);
       width: 44px;
       height: 44px;
       background: rgba(0, 255, 136, 0.2);
@@ -128,136 +140,119 @@
       font-weight: bold;
     }
 
-    /* Mobile touch controls */
-    .touch-controls {
+    /* ========================================
+       MOBILE TOUCH CONTROLS - Side panels
+       ======================================== */
+    .touch-zone-left,
+    .touch-zone-right {
       display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 50;
-    }
-
-    .touch-zone {
-      position: absolute;
-      pointer-events: auto;
-      display: flex;
-      align-items: center;
+      flex-direction: column;
       justify-content: center;
-    }
-
-    /* Left side - movement */
-    .touch-left {
-      left: 0;
-      top: 0;
-      width: 35%;
+      align-items: center;
       height: 100%;
+      padding: 10px;
     }
 
-    /* Right side - actions */
-    .touch-right {
-      right: 0;
-      top: 0;
-      width: 35%;
-      height: 100%;
+    .touch-zone-left {
+      padding-left: env(safe-area-inset-left, 10px);
+    }
+    .touch-zone-right {
+      padding-right: env(safe-area-inset-right, 10px);
     }
 
+    /* D-Pad */
     .dpad {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
-      width: 140px;
-      height: 140px;
-    }
-
-    /* Safe area support for notched phones */
-    @supports (padding: env(safe-area-inset-bottom)) {
-      .dpad {
-        bottom: calc(20px + env(safe-area-inset-bottom));
-        left: calc(20px + env(safe-area-inset-left));
-      }
-      .action-buttons {
-        bottom: calc(20px + env(safe-area-inset-bottom));
-        right: calc(20px + env(safe-area-inset-right));
-      }
+      position: relative;
+      width: 130px;
+      height: 130px;
     }
 
     .dpad-btn {
       position: absolute;
-      width: 50px;
-      height: 50px;
+      width: 46px;
+      height: 46px;
       background: rgba(0, 255, 136, 0.15);
       border: 2px solid rgba(0, 255, 136, 0.4);
-      border-radius: 12px;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: rgba(0, 255, 136, 0.6);
-      font-size: 20px;
+      color: rgba(0, 255, 136, 0.7);
+      font-size: 18px;
       transition: background 0.1s, transform 0.1s;
     }
 
     .dpad-btn.active {
-      background: rgba(0, 255, 136, 0.4);
-      transform: scale(0.95);
+      background: rgba(0, 255, 136, 0.5);
+      transform: scale(0.92);
     }
 
     .dpad-left { left: 0; top: 50%; transform: translateY(-50%); }
     .dpad-right { right: 0; top: 50%; transform: translateY(-50%); }
     .dpad-up { top: 0; left: 50%; transform: translateX(-50%); }
     .dpad-down { bottom: 0; left: 50%; transform: translateX(-50%); }
-    .dpad-left.active { transform: translateY(-50%) scale(0.95); }
-    .dpad-right.active { transform: translateY(-50%) scale(0.95); }
-    .dpad-up.active { transform: translateX(-50%) scale(0.95); }
-    .dpad-down.active { transform: translateX(-50%) scale(0.95); }
+    .dpad-left.active { transform: translateY(-50%) scale(0.92); }
+    .dpad-right.active { transform: translateY(-50%) scale(0.92); }
+    .dpad-up.active { transform: translateX(-50%) scale(0.92); }
+    .dpad-down.active { transform: translateX(-50%) scale(0.92); }
 
+    /* Action buttons */
     .action-buttons {
-      position: absolute;
-      bottom: 20px;
-      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      align-items: center;
     }
 
     .action-btn {
-      width: 70px;
-      height: 70px;
+      width: 65px;
+      height: 65px;
       border-radius: 50%;
       background: rgba(0, 255, 136, 0.15);
       border: 2px solid rgba(0, 255, 136, 0.4);
       display: flex;
       align-items: center;
       justify-content: center;
-      color: rgba(0, 255, 136, 0.8);
-      font-size: 14px;
+      color: rgba(0, 255, 136, 0.9);
+      font-size: 13px;
       font-weight: bold;
-      margin: 10px;
       transition: background 0.1s, transform 0.1s;
     }
 
     .action-btn.active {
       background: rgba(0, 255, 136, 0.5);
-      transform: scale(0.95);
+      transform: scale(0.92);
     }
 
-    .btn-jump {
-      position: absolute;
-      bottom: 0;
-      right: 80px;
-    }
-
-    .btn-dash {
-      position: absolute;
-      bottom: 60px;
-      right: 0;
-    }
-
-    /* Show touch controls on touch devices */
+    /* Show mobile layout on touch devices */
     @media (hover: none) and (pointer: coarse) {
       #controls { display: none; }
-      .touch-controls { display: block; }
       #fullscreen-btn { display: flex; }
       #start-screen { display: flex; }
+
+      #game-container {
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 5px;
+        gap: 5px;
+      }
+
+      .touch-zone-left,
+      .touch-zone-right {
+        display: flex;
+        min-width: 140px;
+        flex: 0 0 auto;
+      }
+
+      /* Game viewport takes remaining space in center */
+      #game {
+        flex: 1 1 auto;
+        max-width: calc(100% - 300px); /* Leave space for controls */
+        max-height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
     }
 
     /* Hide start screen once game started */
@@ -309,7 +304,29 @@
   </style>
 </head>
 <body>
-  <div id="game"></div>
+  <!-- Main layout container -->
+  <div id="game-container">
+    <!-- Left touch zone (D-pad) -->
+    <div class="touch-zone-left">
+      <div class="dpad">
+        <div class="dpad-btn dpad-left" data-input="left">◀</div>
+        <div class="dpad-btn dpad-right" data-input="right">▶</div>
+        <div class="dpad-btn dpad-up" data-input="up">▲</div>
+        <div class="dpad-btn dpad-down" data-input="down">▼</div>
+      </div>
+    </div>
+
+    <!-- Game viewport (center) -->
+    <div id="game"></div>
+
+    <!-- Right touch zone (action buttons) -->
+    <div class="touch-zone-right">
+      <div class="action-buttons">
+        <div class="action-btn" data-input="jump">JUMP</div>
+        <div class="action-btn" data-input="dash">DASH</div>
+      </div>
+    </div>
+  </div>
 
   <!-- Start screen for mobile - triggers fullscreen -->
   <div id="start-screen">
@@ -331,24 +348,6 @@
     <span><span class="key">R</span> Reset</span>
   </div>
 
-  <!-- Mobile touch controls -->
-  <div class="touch-controls" id="touchControls">
-    <div class="touch-zone touch-left">
-      <div class="dpad">
-        <div class="dpad-btn dpad-left" data-input="left">◀</div>
-        <div class="dpad-btn dpad-right" data-input="right">▶</div>
-        <div class="dpad-btn dpad-up" data-input="up">▲</div>
-        <div class="dpad-btn dpad-down" data-input="down">▼</div>
-      </div>
-    </div>
-    <div class="touch-zone touch-right">
-      <div class="action-buttons">
-        <div class="action-btn btn-jump" data-input="jump">JUMP</div>
-        <div class="action-btn btn-dash" data-input="dash">DASH</div>
-      </div>
-    </div>
-  </div>
-
   <!-- Rotate hint for portrait mode -->
   <div id="rotate-hint">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -365,9 +364,9 @@
     function requestFullscreen(elem) {
       if (elem.requestFullscreen) {
         return elem.requestFullscreen();
-      } else if (elem.webkitRequestFullscreen) { // Safari
+      } else if (elem.webkitRequestFullscreen) {
         return elem.webkitRequestFullscreen();
-      } else if (elem.msRequestFullscreen) { // IE11
+      } else if (elem.msRequestFullscreen) {
         return elem.msRequestFullscreen();
       }
       return Promise.reject('Fullscreen not supported');
@@ -393,7 +392,6 @@
         exitFullscreen().catch(() => {});
       } else {
         requestFullscreen(document.documentElement).catch(() => {
-          // Fallback: try on body
           requestFullscreen(document.body).catch(() => {});
         });
       }
@@ -421,16 +419,14 @@
 
     // Update button icon based on fullscreen state
     function updateFullscreenButton() {
-      fullscreenBtn.textContent = isFullscreen() ? '⛶' : '⛶';
+      fullscreenBtn.textContent = isFullscreen() ? '✕' : '⛶';
     }
     document.addEventListener('fullscreenchange', updateFullscreenButton);
     document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
 
     // Lock screen orientation to landscape when possible
     if (screen.orientation && screen.orientation.lock) {
-      screen.orientation.lock('landscape').catch(() => {
-        // Orientation lock not supported or denied
-      });
+      screen.orientation.lock('landscape').catch(() => {});
     }
 
     // Prevent pull-to-refresh and bounce on iOS
@@ -440,7 +436,7 @@
       }
     }, { passive: false });
 
-    // Hide address bar trick for iOS Safari (scroll to hide)
+    // Hide address bar trick for iOS Safari
     window.addEventListener('load', () => {
       setTimeout(() => {
         window.scrollTo(0, 1);
