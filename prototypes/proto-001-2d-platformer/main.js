@@ -74,8 +74,15 @@ class GameScene extends Phaser.Scene {
       // Murs
       wallJumpForceX: 380,
       wallJumpForceY: 520,
+      wallJumpForceXToward: 120,     // Force X réduite quand on saute vers le mur (cloches SMB)
+      wallJumpForceYToward: 420,     // Force Y réduite pour les cloches (montée rapide)
       wallSlideSpeed: 80,
       wallClimbSpeed: 120,           // Vitesse de grimpe
+
+      // Contrôle prédictif (style AAA)
+      turnAroundBoost: 1.8,          // Multiplicateur d'accélération au changement de direction
+      inputAnticipationTime: 80,     // ms de mémorisation de la direction pressée
+      apexControlBoost: 1.5,         // Boost de contrôle horizontal à l'apex du saut
 
       // Dash (style Celeste)
       dashSpeed: 550,
@@ -124,6 +131,11 @@ class GameScene extends Phaser.Scene {
     this.lastVelocityY = 0;           // Pour détecter l'atterrissage fort
     this.speedTrail = [];             // Pour les speed lines
     this.trailSprites = [];           // Sprites de la traînée (reset à chaque niveau!)
+
+    // Contrôle prédictif (style AAA)
+    this.lastInputDir = 0;            // Dernière direction d'input (-1, 0, 1)
+    this.inputDirTimer = 0;           // Timer pour mémoriser la direction
+    this.lastVelocityX = 0;           // Pour détecter les changements de direction
 
     // === MONDE ET CAMÉRA ===
     // Monde compact pour niveaux resserrés
@@ -10967,6 +10979,20 @@ class GameScene extends Phaser.Scene {
       this.jumpBufferTimer -= delta;
     }
 
+    // === INPUT ANTICIPATION (mémoriser la direction pour wall jumps) ===
+    if (left) {
+      this.lastInputDir = -1;
+      this.inputDirTimer = cfg.inputAnticipationTime;
+    } else if (right) {
+      this.lastInputDir = 1;
+      this.inputDirTimer = cfg.inputAnticipationTime;
+    } else if (this.inputDirTimer > 0) {
+      this.inputDirTimer -= delta;
+      if (this.inputDirTimer <= 0) {
+        this.lastInputDir = 0;
+      }
+    }
+
     // === DASH (style Celeste) ===
     if (this.isDashing) {
       this.dashTimer -= delta;
@@ -11068,10 +11094,24 @@ class GameScene extends Phaser.Scene {
     if (!this.isDashing) {
       const currentVelX = body.velocity.x;
       const inAir = !onGround;
-      const accel = inAir ? cfg.airAccel : cfg.playerAccel;
+      let accel = inAir ? cfg.airAccel : cfg.playerAccel;
       const decel = inAir ? cfg.airDecel : cfg.playerDecel;
       // Vitesse réduite quand accroupi
       const maxSpeed = this.isCrouching ? cfg.playerSpeed * 0.4 : cfg.playerSpeed;
+
+      // Turn-around boost: accélération augmentée quand on change de direction
+      // C'est ce qui rend le contrôle "snappy" dans les jeux AAA
+      const turningAround = (left && currentVelX > 50) || (right && currentVelX < -50);
+      if (turningAround) {
+        accel *= cfg.turnAroundBoost;
+      }
+
+      // Apex control boost: meilleur contrôle au sommet du saut
+      // Permet d'ajuster sa trajectoire au dernier moment (très satisfaisant)
+      const atApex = inAir && Math.abs(body.velocity.y) < cfg.apexThreshold;
+      if (atApex) {
+        accel *= cfg.apexControlBoost;
+      }
 
       if (this.wallJumpLockTimer > 0) {
         this.wallJumpLockTimer -= delta;
@@ -11089,6 +11129,9 @@ class GameScene extends Phaser.Scene {
           }
         }
       }
+
+      // Mémoriser la vélocité pour le prochain frame
+      this.lastVelocityX = currentVelX;
     }
 
     // === SAUTS ===
@@ -11106,18 +11149,42 @@ class GameScene extends Phaser.Scene {
       this.playerScaleX = 0.7;
       this.playerScaleY = 1.3;
     }
-    // Wall jump
+    // Wall jump (directionnel style Super Meat Boy)
     else if (this.jumpBufferTimer > 0 && this.wallCoyoteTimer > 0 && this.lastWallDir !== 0 && !this.isDashing) {
-      body.setVelocityY(-cfg.wallJumpForceY);
-      body.setVelocityX(-this.lastWallDir * cfg.wallJumpForceX);
+      // Déterminer le type de wall jump basé sur l'input du joueur
+      // lastWallDir: -1 = mur à gauche, 1 = mur à droite
+      // lastInputDir: -1 = appuie gauche, 1 = appuie droite, 0 = pas d'input
+
+      const jumpingTowardWall = this.lastInputDir === this.lastWallDir;
+      const jumpingAwayFromWall = this.lastInputDir === -this.lastWallDir;
+
+      if (jumpingTowardWall) {
+        // CLOCHE: Saut vers le mur pour monter (style SMB)
+        // Petit saut vertical avec légère poussée vers le mur
+        body.setVelocityY(-cfg.wallJumpForceYToward);
+        body.setVelocityX(this.lastWallDir * cfg.wallJumpForceXToward);
+        // Pas de lock timer pour permettre les cloches rapides
+        this.wallJumpLockTimer = 0;
+      } else if (jumpingAwayFromWall) {
+        // ÉJECTION: Grand saut qui s'éloigne du mur
+        body.setVelocityY(-cfg.wallJumpForceY);
+        body.setVelocityX(-this.lastWallDir * cfg.wallJumpForceX);
+        // Lock timer pour préserver le momentum
+        this.wallJumpLockTimer = 100;
+      } else {
+        // NEUTRE: Saut modéré (pas d'input horizontal)
+        body.setVelocityY(-cfg.wallJumpForceY * 0.9);
+        body.setVelocityX(-this.lastWallDir * cfg.wallJumpForceX * 0.5);
+        this.wallJumpLockTimer = 50;
+      }
+
       this.wallCoyoteTimer = 0;
       this.jumpBufferTimer = 0;
-      this.wallJumpLockTimer = 150;
       this.canDoubleJump = true;
       this.hasDoubleJumped = false;
       this.isJumping = true;
       this.playSound('wallJump');
-      this.particleWallJump(this.player.x, this.player.y, -this.lastWallDir);
+      this.particleWallJump(this.player.x, this.player.y, jumpingTowardWall ? this.lastWallDir : -this.lastWallDir);
       this.playerScaleX = 0.7;
       this.playerScaleY = 1.3;
     }
