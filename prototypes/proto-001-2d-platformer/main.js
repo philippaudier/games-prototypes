@@ -1,5 +1,315 @@
 // Phaser loaded via CDN in index.html
 
+// ==================== MENU SCENE ====================
+class MenuScene extends Phaser.Scene {
+  constructor() {
+    super('MenuScene');
+  }
+
+  create() {
+    const W = 960;
+    const H = 540;
+    const cx = W / 2;
+
+    // Fond dégradé
+    const bgGraphics = this.add.graphics();
+    const topColor = { r: 0x1a, g: 0x1a, b: 0x2e };
+    const bottomColor = { r: 0x0a, g: 0x0a, b: 0x18 };
+    const steps = 20;
+    for (let i = 0; i < steps; i++) {
+      const t = i / (steps - 1);
+      const r = Math.round(topColor.r + (bottomColor.r - topColor.r) * t);
+      const g = Math.round(topColor.g + (bottomColor.g - topColor.g) * t);
+      const b = Math.round(topColor.b + (bottomColor.b - topColor.b) * t);
+      const color = (r << 16) | (g << 8) | b;
+      bgGraphics.fillStyle(color, 1);
+      bgGraphics.fillRect(0, (i * H) / steps, W, H / steps + 1);
+    }
+
+    // Titre du jeu
+    this.add.text(cx, 35, 'SUNDAY', {
+      fontSize: '42px',
+      fontFamily: 'monospace',
+      color: '#00ff88',
+      stroke: '#004422',
+      strokeThickness: 3
+    }).setOrigin(0.5);
+
+    // Config
+    const bossNames = ['', 'CHARGER', 'SPINNER', 'SPLITTER', 'GUARDIAN', 'SUMMONER',
+                       'CRUSHER', 'PHANTOM', 'BERSERKER', 'ARCHITECT', 'TWINS'];
+    const maxLevel = 50;
+    const cols = 5; // 4 niveaux + 1 boss par ligne
+    const rows = 10;
+
+    // Layout
+    const gridStartX = 120;
+    const gridStartY = 75;
+    const cellW = 38;
+    const cellH = 38;
+    const cellGap = 4;
+    const rowGap = 8;
+    const bossWidth = 90;
+
+    this.selectedLevel = 1;
+    this.levelButtons = [];
+
+    for (let world = 0; world < rows; world++) {
+      const rowY = gridStartY + world * (cellH + rowGap);
+      const worldNum = world + 1;
+
+      // Numéro du monde (à gauche)
+      this.add.text(gridStartX - 25, rowY + cellH / 2, `${worldNum}`, {
+        fontSize: '14px',
+        fontFamily: 'monospace',
+        color: '#555555'
+      }).setOrigin(1, 0.5);
+
+      // 4 niveaux normaux
+      for (let i = 0; i < 4; i++) {
+        const level = world * 5 + i + 1;
+        const x = gridStartX + i * (cellW + cellGap) + cellW / 2;
+        const y = rowY + cellH / 2;
+
+        const btnBg = this.add.rectangle(x, y, cellW, cellH, 0x222233);
+        btnBg.setStrokeStyle(1, 0x444466);
+        btnBg.setInteractive({ useHandCursor: true });
+
+        const levelText = this.add.text(x, y, `${level}`, {
+          fontSize: '14px',
+          fontFamily: 'monospace',
+          color: '#aaaaaa'
+        }).setOrigin(0.5);
+
+        this.levelButtons.push({ bg: btnBg, text: levelText, level, isBoss: false });
+        this.setupButton(btnBg, level, false);
+      }
+
+      // Boss (à droite, plus large)
+      const bossLevel = (world + 1) * 5;
+      const bossX = gridStartX + 4 * (cellW + cellGap) + bossWidth / 2;
+      const bossY = rowY + cellH / 2;
+
+      const bossBg = this.add.rectangle(bossX, bossY, bossWidth, cellH, 0x331100);
+      bossBg.setStrokeStyle(2, 0x884400);
+      bossBg.setInteractive({ useHandCursor: true });
+
+      const bossText = this.add.text(bossX, bossY - 6, bossNames[worldNum], {
+        fontSize: '10px',
+        fontFamily: 'monospace',
+        color: '#ff8800'
+      }).setOrigin(0.5);
+
+      const bossNumText = this.add.text(bossX, bossY + 10, `${bossLevel}`, {
+        fontSize: '12px',
+        fontFamily: 'monospace',
+        color: '#ffaa44'
+      }).setOrigin(0.5);
+
+      this.levelButtons.push({ bg: bossBg, text: bossText, numText: bossNumText, level: bossLevel, isBoss: true });
+      this.setupButton(bossBg, bossLevel, true);
+    }
+
+    // Zone droite: Preview + Bouton START
+    const rightX = 620;
+
+    // Preview box
+    const previewBg = this.add.rectangle(rightX + 150, 220, 280, 200, 0x111122, 0.8);
+    previewBg.setStrokeStyle(2, 0x333355);
+
+    this.previewTitle = this.add.text(rightX + 150, 135, 'NIVEAU 1', {
+      fontSize: '24px',
+      fontFamily: 'monospace',
+      color: '#ffffff'
+    }).setOrigin(0.5);
+
+    this.previewDesc = this.add.text(rightX + 150, 165, 'Premier niveau - Tutoriel', {
+      fontSize: '12px',
+      fontFamily: 'monospace',
+      color: '#888888'
+    }).setOrigin(0.5);
+
+    // Infos niveau
+    this.previewInfo = this.add.text(rightX + 150, 220, '', {
+      fontSize: '11px',
+      fontFamily: 'monospace',
+      color: '#666666',
+      align: 'center',
+      lineSpacing: 8
+    }).setOrigin(0.5);
+
+    // Bouton START
+    const startBtn = this.add.rectangle(rightX + 150, 360, 180, 50, 0x00aa55);
+    startBtn.setStrokeStyle(3, 0x00ff88);
+    startBtn.setInteractive({ useHandCursor: true });
+
+    this.startText = this.add.text(rightX + 150, 360, 'START', {
+      fontSize: '24px',
+      fontFamily: 'monospace',
+      color: '#ffffff'
+    }).setOrigin(0.5);
+
+    startBtn.on('pointerover', () => {
+      startBtn.setFillStyle(0x00cc66);
+      startBtn.setScale(1.03);
+      this.startText.setScale(1.03);
+    });
+    startBtn.on('pointerout', () => {
+      startBtn.setFillStyle(0x00aa55);
+      startBtn.setScale(1);
+      this.startText.setScale(1);
+    });
+    startBtn.on('pointerdown', () => this.startGame());
+
+    // Instructions
+    this.add.text(rightX + 150, 410, 'Double-clic ou ENTRÉE', {
+      fontSize: '10px',
+      fontFamily: 'monospace',
+      color: '#555555'
+    }).setOrigin(0.5);
+
+    // Légende
+    this.add.text(rightX + 150, 470, 'Navigation: ZQSD / Flèches', {
+      fontSize: '9px',
+      fontFamily: 'monospace',
+      color: '#444444'
+    }).setOrigin(0.5);
+
+    // Sélection initiale
+    this.selectLevel(1);
+    this.updatePreview();
+
+    // Contrôles clavier
+    this.input.keyboard.on('keydown-ENTER', () => this.startGame());
+    this.input.keyboard.on('keydown-SPACE', () => this.startGame());
+    this.input.keyboard.on('keydown-LEFT', () => this.navigateLevel(-1, 0));
+    this.input.keyboard.on('keydown-RIGHT', () => this.navigateLevel(1, 0));
+    this.input.keyboard.on('keydown-UP', () => this.navigateLevel(0, -1));
+    this.input.keyboard.on('keydown-DOWN', () => this.navigateLevel(0, 1));
+    this.input.keyboard.on('keydown-Q', () => this.navigateLevel(-1, 0));
+    this.input.keyboard.on('keydown-D', () => this.navigateLevel(1, 0));
+    this.input.keyboard.on('keydown-Z', () => this.navigateLevel(0, -1));
+    this.input.keyboard.on('keydown-S', () => this.navigateLevel(0, 1));
+  }
+
+  setupButton(btn, level, isBoss) {
+    btn.on('pointerover', () => {
+      if (this.selectedLevel !== level) {
+        btn.setFillStyle(isBoss ? 0x552200 : 0x333355);
+      }
+    });
+    btn.on('pointerout', () => {
+      if (this.selectedLevel !== level) {
+        btn.setFillStyle(isBoss ? 0x331100 : 0x222233);
+      }
+    });
+    btn.on('pointerdown', () => {
+      if (this.lastClickedLevel === level && Date.now() - this.lastClickTime < 300) {
+        this.startGame();
+      } else {
+        this.selectLevel(level);
+        this.updatePreview();
+      }
+      this.lastClickedLevel = level;
+      this.lastClickTime = Date.now();
+    });
+  }
+
+  selectLevel(level) {
+    // Reset tous les boutons
+    this.levelButtons.forEach(btn => {
+      btn.bg.setFillStyle(btn.isBoss ? 0x331100 : 0x222233);
+      btn.bg.setStrokeStyle(btn.isBoss ? 2 : 1, btn.isBoss ? 0x884400 : 0x444466);
+      if (btn.text) btn.text.setColor(btn.isBoss ? '#ff8800' : '#aaaaaa');
+    });
+
+    // Sélectionner le nouveau
+    this.selectedLevel = level;
+    const btn = this.levelButtons.find(b => b.level === level);
+    if (btn) {
+      btn.bg.setFillStyle(btn.isBoss ? 0x664400 : 0x005533);
+      btn.bg.setStrokeStyle(2, 0x00ff88);
+      if (btn.text) btn.text.setColor('#ffffff');
+    }
+  }
+
+  updatePreview() {
+    const level = this.selectedLevel;
+    const isBoss = level % 5 === 0;
+    const bossNum = Math.floor(level / 5);
+    const bossNames = ['', 'CHARGER', 'SPINNER', 'SPLITTER', 'GUARDIAN', 'SUMMONER',
+                       'CRUSHER', 'PHANTOM', 'BERSERKER', 'ARCHITECT', 'TWINS'];
+
+    if (isBoss) {
+      this.previewTitle.setText(bossNames[bossNum]);
+      this.previewTitle.setColor('#ff8800');
+      this.previewDesc.setText(`Boss du monde ${bossNum}`);
+
+      const bossDescs = {
+        1: 'Charge violemment\nÉvite ses rushes !',
+        2: 'Tirs circulaires\nTrouve les angles morts',
+        3: 'Écrase le sol\nSaute par-dessus les ondes',
+        4: 'Se divise en 2\nÉlimine les copies',
+        5: 'Bouclier rotatif\nAttaque quand il s\'ouvre',
+        6: 'Devient invisible\nRepère son ombre',
+        7: 'Deux boss en un\nGère les deux !',
+        8: 'Rage croissante\nTue-le vite',
+        9: 'Invoque des sbires\nFocus le boss',
+        10: 'Crée des murs\nNe te fais pas coincer'
+      };
+      this.previewInfo.setText(bossDescs[bossNum] || 'Boss mystérieux...');
+    } else {
+      this.previewTitle.setText(`NIVEAU ${level}`);
+      this.previewTitle.setColor('#ffffff');
+
+      const world = Math.floor((level - 1) / 5) + 1;
+      const inWorld = ((level - 1) % 5) + 1;
+      this.previewDesc.setText(`Monde ${world} - Étape ${inWorld}/5`);
+
+      let info = '';
+      if (level === 1) info = 'Tutoriel\nApprends les bases';
+      else if (level <= 5) info = 'Ennemis basiques\nMaîtrise les sauts';
+      else if (level <= 10) info = 'Plateformes mobiles\nTiming important';
+      else if (level <= 20) info = 'Tirs ennemis\nDodge & jump';
+      else if (level <= 30) info = 'Pièges multiples\nPrécision requise';
+      else if (level <= 40) info = 'Combinaisons\nRéflexes et mémoire';
+      else info = 'Niveaux avancés\nBonne chance !';
+
+      this.previewInfo.setText(info);
+    }
+  }
+
+  navigateLevel(dx, dy) {
+    const cols = 5;
+    const current = this.selectedLevel;
+    const world = Math.floor((current - 1) / 5);
+    const inWorld = (current - 1) % 5;
+
+    let newWorld = world + dy;
+    let newInWorld = inWorld + dx;
+
+    // Wrap
+    if (newInWorld < 0) newInWorld = 4;
+    if (newInWorld > 4) newInWorld = 0;
+    if (newWorld < 0) newWorld = 9;
+    if (newWorld > 9) newWorld = 0;
+
+    const newLevel = newWorld * 5 + newInWorld + 1;
+    if (newLevel >= 1 && newLevel <= 50) {
+      this.selectLevel(newLevel);
+      this.updatePreview();
+    }
+  }
+
+  startGame() {
+    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.time.delayedCall(300, () => {
+      this.scene.start('GameScene', { level: this.selectedLevel });
+    });
+  }
+}
+
+// ==================== GAME SCENE ====================
 class GameScene extends Phaser.Scene {
   constructor() {
     super('GameScene');
@@ -48,12 +358,12 @@ class GameScene extends Phaser.Scene {
   create() {
     // Config gameplay - Tuné pour un feel "pro" style Celeste/Super Meat Boy
     this.config = {
-      // Mouvement horizontal
-      playerSpeed: 340,
-      playerAccel: 2800,     // Accélération au sol (réduite pour moins de glisse)
-      playerDecel: 8000,     // Décélération au sol (augmentée pour arrêt rapide)
-      airAccel: 2400,        // Accélération en l'air (légèrement réduite)
-      airDecel: 1800,        // Décélération en l'air (beaucoup plus faible = momentum)
+      // Mouvement horizontal - valeurs ajustées pour contrôle précis
+      playerSpeed: 280,      // Vitesse max réduite pour meilleur contrôle
+      playerAccel: 3500,     // Accélération rapide = réponse immédiate
+      playerDecel: 12000,    // Décélération très forte = arrêt net
+      airAccel: 3000,        // Bon contrôle aérien
+      airDecel: 4000,        // Arrêt rapide en l'air aussi = moins slippery
 
       // Saut
       jumpForce: 580,
@@ -206,7 +516,9 @@ class GameScene extends Phaser.Scene {
       r: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R), // Reset rapide
       shift: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT), // Dash
       x: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X), // Dash alternatif
-      c: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C)  // Dash alternatif 2
+      c: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C), // Dash alternatif 2
+      m: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M), // Menu
+      esc: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC) // Menu
     };
 
     // Mobile touch controls
@@ -2453,7 +2765,7 @@ class GameScene extends Phaser.Scene {
     }).setOrigin(1, 1).setScrollFactor(0).setDepth(uiDepth + 1);
 
     // Contrôles (très discret, en bas à gauche)
-    this.add.text(padding, vh - padding, 'ZQSD + ESPACE | R = Reset', {
+    this.add.text(padding, vh - padding, 'ZQSD + ESPACE | R = Reset | M = Menu', {
       ...textStyle, fontSize: '9px', fill: '#444444'
     }).setOrigin(0, 1).setScrollFactor(0).setDepth(uiDepth + 1);
 
@@ -2865,87 +3177,59 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
-    // CITY BACKGROUND pour niveaux normaux - Simple et épuré
-    this.cameras.main.setBackgroundColor(0x0a0a18);
+    // FOND DÉGRADÉ SIMPLE - Soleil en haut à gauche
     const W = this.WORLD.width;
     const H = this.WORLD.height;
-    const gy = this.WORLD.groundY;
+    this.stars = []; // Vide pour les niveaux normaux
 
-    // Étoiles avec plusieurs layers de parallax (moins fort)
-    this.stars = [];
+    // Créer le dégradé avec des bandes horizontales
+    const bgGraphics = this.add.graphics();
+    bgGraphics.setDepth(-20);
 
-    // Layer 1 - Étoiles lointaines (presque pas de parallax)
-    for (let i = 0; i < 50; i++) {
-      const star = this.add.circle(
-        this.rng.between(0, W),
-        this.rng.between(0, 300),
-        1,
-        0xffffff,
-        this.rng.realInRange(0.2, 0.5)
-      );
-      star.baseX = star.x;
-      star.baseY = star.y;
-      star.parallaxStrength = 2; // Très faible parallax
-      star.setDepth(-12);
-      this.stars.push(star);
+    // Couleurs du dégradé (du haut vers le bas)
+    const topColor = { r: 0x87, g: 0xCE, b: 0xEB };    // Bleu ciel clair
+    const bottomColor = { r: 0x2D, g: 0x1B, b: 0x4E }; // Violet foncé
+
+    const steps = 30;
+    for (let i = 0; i < steps; i++) {
+      const t = i / (steps - 1);
+      const r = Math.round(topColor.r + (bottomColor.r - topColor.r) * t);
+      const g = Math.round(topColor.g + (bottomColor.g - topColor.g) * t);
+      const b = Math.round(topColor.b + (bottomColor.b - topColor.b) * t);
+      const color = (r << 16) | (g << 8) | b;
+
+      bgGraphics.fillStyle(color, 1);
+      bgGraphics.fillRect(0, (i * H) / steps, W, H / steps + 1);
     }
 
-    // Layer 2 - Étoiles moyennes
-    for (let i = 0; i < 35; i++) {
-      const star = this.add.circle(
-        this.rng.between(0, W),
-        this.rng.between(0, 280),
-        this.rng.between(1, 2),
-        0xffffff,
-        this.rng.realInRange(0.3, 0.7)
-      );
-      star.baseX = star.x;
-      star.baseY = star.y;
-      star.parallaxStrength = 5; // Faible parallax
-      star.setDepth(-11);
-      this.stars.push(star);
+    // Soleil en haut à gauche
+    const sunX = 80;
+    const sunY = 60;
+
+    // Halo du soleil (cercles concentriques)
+    for (let i = 5; i >= 0; i--) {
+      const radius = 25 + i * 20;
+      const alpha = 0.15 - i * 0.02;
+      const halo = this.add.circle(sunX, sunY, radius, 0xFFDD44, alpha);
+      halo.setDepth(-19);
     }
 
-    // Layer 3 - Quelques étoiles brillantes
-    for (let i = 0; i < 18; i++) {
-      const star = this.add.circle(
-        this.rng.between(0, W),
-        this.rng.between(0, 250),
-        2,
-        0xffffff,
-        this.rng.realInRange(0.5, 0.9)
-      );
-      star.baseX = star.x;
-      star.baseY = star.y;
-      star.parallaxStrength = 8; // Léger parallax
-      star.setDepth(-10);
-      this.stars.push(star);
-    }
+    // Soleil principal
+    const sun = this.add.circle(sunX, sunY, 25, 0xFFEE88);
+    sun.setDepth(-18);
 
-    // SKYLINE - Dégradé simple d'immeubles (3 couches)
-
-    // Couche 3 (plus loin) - silhouettes très sombres
-    for (let x = -50; x < W + 50; x += this.rng.between(40, 70)) {
-      const h = this.rng.between(200, 380);
-      const ww = this.rng.between(30, 60);
-      const building = this.add.rectangle(x, gy - h/2, ww, h, 0x06060c);
-      building.setDepth(-8);
-    }
-
-    // Couche 2 (milieu) - silhouettes sombres
-    for (let x = -30; x < W + 30; x += this.rng.between(50, 90)) {
-      const h = this.rng.between(160, 300);
-      const ww = this.rng.between(35, 65);
-      const building = this.add.rectangle(x, gy - h/2, ww, h, 0x0c0c16);
-      building.setDepth(-7);
-    }
-
-    // Couche 1 (devant) - silhouettes
-    for (let x = 0; x < W; x += this.rng.between(60, 110)) {
-      const h = this.rng.between(120, 220);
-      const ww = this.rng.between(45, 80);
-      const building = this.add.rectangle(x, gy - h/2, ww, h, 0x14141f);
-      building.setDepth(-6);
+    // Rayons du soleil (lignes subtiles)
+    const rayGraphics = this.add.graphics();
+    rayGraphics.setDepth(-17);
+    rayGraphics.lineStyle(2, 0xFFDD66, 0.3);
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const innerR = 35;
+      const outerR = 70;
+      rayGraphics.beginPath();
+      rayGraphics.moveTo(sunX + Math.cos(angle) * innerR, sunY + Math.sin(angle) * innerR);
+      rayGraphics.lineTo(sunX + Math.cos(angle) * outerR, sunY + Math.sin(angle) * outerR);
+      rayGraphics.strokePath();
     }
   }
 
@@ -5787,7 +6071,7 @@ class GameScene extends Phaser.Scene {
     if (!this.boss || !this.boss.active) return;
 
     // Positionner l'œil au centre du boss
-    if (this.bossEye && this.player) {
+    if (this.bossEye && this.player && this.player.active) {
       const bx = this.boss.x;
       const by = this.boss.y;
       const eyeRadius = this.bossEyeRadius || 12;
@@ -5951,17 +6235,19 @@ class GameScene extends Phaser.Scene {
       newVelX += Math.cos(spiralAngle) * phys.warpDrift * deltaTime;
       newVelY += Math.sin(spiralAngle) * phys.warpDrift * 0.5 * deltaTime;
     } else if (phys.weight === 'crushing') {
-      // CRUSHER: Ultra lourd, énorme inertie, slams dévastateurs
+      // CRUSHER: Lourd mais menaçant - suit le joueur avec détermination
       const diffX = this.boss.targetVelX - currentVelX;
       const diffY = this.boss.targetVelY - currentVelY;
-      // Accélération très lente
-      newVelX = currentVelX + diffX * 0.01;
-      newVelY = currentVelY + diffY * 0.01;
+      // Accélération plus réactive pour mettre la pression
+      newVelX = currentVelX + diffX * 0.08;
+      newVelY = currentVelY + diffY * 0.08;
+      // Calculer la vitesse actuelle
+      const crushSpeed = Math.sqrt(currentVelX * currentVelX + currentVelY * currentVelY);
       // Tremblement constant de poids
-      const shakeIntensity = Math.min(speed / 100, 0.03);
+      const shakeIntensity = Math.min(crushSpeed / 100, 0.05);
       this.boss.setScale(1 + Math.sin(time * 0.03) * shakeIntensity, 1 - Math.sin(time * 0.03) * shakeIntensity);
       // Effet de poussière quand il bouge
-      if (speed > 30 && Math.random() < 0.1) {
+      if (crushSpeed > 20 && Math.random() < 0.15) {
         this.emitParticles(this.boss.x, this.boss.y + 30, {
           count: 2, colors: [0x884422, 0x553311],
           minSpeed: 20, maxSpeed: 50, minSize: 3, maxSize: 6,
@@ -6292,6 +6578,7 @@ class GameScene extends Phaser.Scene {
   // === MOUVEMENT: ORBITE AUTOUR DU JOUEUR ===
   chargerPace() {
     if (!this.boss || !this.boss.active) return;
+    if (!this.player || !this.player.active) return;
     if (this.chargerState !== 'idle') return;
 
     const toPlayerX = this.player.x - this.boss.x;
@@ -6390,6 +6677,7 @@ class GameScene extends Phaser.Scene {
   // === CHOIX D'ATTAQUE ===
   chargerChooseAttack() {
     if (!this.boss || !this.boss.active) return;
+    if (!this.player || !this.player.active) return;
     if (this.chargerState !== 'idle') return;
 
     const toPlayerX = this.player.x - this.boss.x;
@@ -6435,6 +6723,7 @@ class GameScene extends Phaser.Scene {
   // === ATTAQUE 1: BULL RUSH (Signature) ===
   chargerBullRush() {
     if (!this.boss || !this.boss.active) return;
+    if (!this.player || !this.player.active) return;
 
     this.chargerState = 'rushing';
     this.chargerLastAttack = this.time.now;
@@ -6683,6 +6972,7 @@ class GameScene extends Phaser.Scene {
       yoyo: true,
       onComplete: () => {
         if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+        if (!this.player || !this.player.active) return;
 
         this.playSound('bossShoot');
 
@@ -6726,6 +7016,7 @@ class GameScene extends Phaser.Scene {
   // === TIR DE HARCÈLEMENT (pendant l'orbite) ===
   chargerQuickShot() {
     if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+    if (!this.player || !this.player.active) return;
 
     // Tir simple vers le joueur sans s'arrêter
     const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
@@ -7003,6 +7294,7 @@ class GameScene extends Phaser.Scene {
 
     this.time.delayedCall(700, () => {
       if (!this.boss || !this.boss.active) return;
+      if (!this.player || !this.player.active) return;
 
       // === TELEPORT ===
       // Particules de disparition
@@ -7254,6 +7546,7 @@ class GameScene extends Phaser.Scene {
 
   bossSplitterMove() {
     if (!this.boss || !this.boss.active) return;
+    if (!this.player || !this.player.active) return;
     if (this.splitterState !== 'idle') return;
 
     // === SPLITTER: LE BLOB - Reste en place, palpite, puis BONDIT ===
@@ -7459,6 +7752,7 @@ class GameScene extends Phaser.Scene {
 
     this.time.delayedCall(350, () => {
       if (!this.boss || !this.boss.active) return;
+      if (!this.player || !this.player.active) return;
       const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
       this.createBossBullet(this.boss.x, this.boss.y, angle, 140);
     });
@@ -7505,6 +7799,7 @@ class GameScene extends Phaser.Scene {
       delay: 2500,
       callback: () => {
         if (!minion.active) return;
+        if (!this.player || !this.player.active) return;
         const angle = Phaser.Math.Angle.Between(minion.x, minion.y, this.player.x, this.player.y);
         this.createBossBullet(minion.x, minion.y, angle, 140);
       },
@@ -7586,6 +7881,7 @@ class GameScene extends Phaser.Scene {
 
   bossGuardianMove() {
     if (!this.boss || !this.boss.active) return;
+    if (!this.player || !this.player.active) return;
     if (this.guardianState !== 'guarding' && this.guardianState !== 'vulnerable') return;
 
     // === GUARDIAN: LE MUR - Avance LENTEMENT et IMPLACABLEMENT ===
@@ -7861,6 +8157,7 @@ class GameScene extends Phaser.Scene {
 
   bossGuardianLaserWindUp() {
     if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+    if (!this.player || !this.player.active) return;
     if (this.guardianState !== 'guarding' && this.guardianState !== 'vulnerable') return;
 
     // SFX d'avertissement
@@ -8049,6 +8346,8 @@ class GameScene extends Phaser.Scene {
 
     // === REPOSITIONNEMENT OCCASIONNEL ===
     // Téléporte vers une meilleure position si joueur trop proche ou trop loin
+    if (!this.player || !this.player.active) return;
+
     const toPlayerX = this.player.x - this.boss.x;
     const toPlayerY = this.player.y - this.boss.y;
     const distToPlayer = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY);
@@ -8088,7 +8387,8 @@ class GameScene extends Phaser.Scene {
         if (!this.boss || !this.boss.active) return;
 
         // Nouvelle position: loin du joueur, en hauteur
-        const side = this.player.x < this.WORLD.width / 2 ? 1 : -1;
+        const playerX = (this.player && this.player.active) ? this.player.x : this.WORLD.width / 2;
+        const side = playerX < this.WORLD.width / 2 ? 1 : -1;
         const newX = this.WORLD.width / 2 + side * (150 + Math.random() * 100);
         const newY = 100 + Math.random() * 80;
 
@@ -8126,10 +8426,11 @@ class GameScene extends Phaser.Scene {
 
   bossSummonerSummonWindUp() {
     if (!this.boss || !this.boss.active) return;
+    if (!this.player || !this.player.active) return;
     if (this.summonerState !== 'drifting') return;
 
     // Limite le nombre d'invocations
-    this.summonedEnemies = this.summonedEnemies.filter(e => e.active);
+    this.summonedEnemies = this.summonedEnemies.filter(e => e && e.active);
     if (this.summonedEnemies.length >= 2) return; // Max 2 minions
 
     this.summonerState = 'channeling';
@@ -8146,6 +8447,7 @@ class GameScene extends Phaser.Scene {
       ease: 'Quad.easeIn',
       onUpdate: () => {
         // Particules de rituel qui convergent
+        if (!this.boss || !this.boss.active) return;
         if (Math.random() < 0.5) {
           const angle = Math.random() * Math.PI * 2;
           const dist = 80;
@@ -8204,6 +8506,11 @@ class GameScene extends Phaser.Scene {
 
     // Spawn ennemi avec particules
     this.time.delayedCall(400, () => {
+      // Vérifications de sécurité
+      if (!this.boss || !this.boss.active) return;
+      if (!this.player || !this.player.active) return;
+      if (!this.summonedEnemies) return;
+
       const spawnX = Phaser.Math.Between(200, this.WORLD.width - 200);
       const spawnY = 200;
 
@@ -8309,8 +8616,9 @@ class GameScene extends Phaser.Scene {
     if (this.summonerState !== 'drifting') return;
 
     // === TELEGRAPH (Wind-up) ===
-    // Flash d'avertissement
-    this.boss.setTint(0xff66ff);
+    // Flash d'avertissement (utiliser setFillStyle pour les rectangles)
+    const originalColor = this.bossColor;
+    this.boss.setFillStyle(0xff66ff);
     this.tweens.add({
       targets: this.boss,
       scaleY: 1.15,
@@ -8319,7 +8627,7 @@ class GameScene extends Phaser.Scene {
       ease: 'Quad.easeOut',
       onComplete: () => {
         if (this.boss && this.boss.active) {
-          this.boss.clearTint();
+          this.boss.setFillStyle(originalColor);
         }
       }
     });
@@ -8363,13 +8671,15 @@ class GameScene extends Phaser.Scene {
 
   hitSummonedEnemy(player, enemy) {
     if (this.isInvincible) return;
+    if (!player || !player.active || !player.body) return;
+    if (!enemy || !enemy.active) return;
 
     if (player.body.velocity.y > 0 && player.y < enemy.y - 10) {
       // SFX + Particules
       this.playSound('enemyKill');
       this.particleEnemyDeath(enemy.x, enemy.y, enemy.deathColor || 0xff4466);
       enemy.destroy();
-      this.summonedEnemies = this.summonedEnemies.filter(e => e.active);
+      this.summonedEnemies = this.summonedEnemies.filter(e => e && e.active);
       this.score += 30;
       this.scoreText.setText(this.score.toString().padStart(6, '0'));
       player.body.setVelocityY(-300);
@@ -8391,9 +8701,9 @@ class GameScene extends Phaser.Scene {
     this.crusherSlamming = false;
     this.crusherShockwaves = [];
 
-    // Timer de mouvement lent et menaçant
+    // Timer de mouvement - fréquent pour suivre le joueur en continu
     this.bossMoveTimer = this.time.addEvent({
-      delay: 2500,
+      delay: 100,
       callback: this.bossCrusherMove,
       callbackScope: this,
       loop: true
@@ -8418,24 +8728,40 @@ class GameScene extends Phaser.Scene {
 
   bossCrusherMove() {
     if (!this.boss || !this.boss.active || this.crusherSlamming) return;
+    if (!this.player || !this.player.active) return;
 
     const toPlayerX = this.player.x - this.boss.x;
-    const speed = this.boss.moveSpeed * 0.3; // Très lent
+    const baseSpeed = 250; // Vitesse de base élevée
 
-    // Se positionner au-dessus du joueur lentement
-    if (Math.abs(toPlayerX) > 80) {
-      this.setBossTargetVelocity(Math.sign(toPlayerX) * speed, 0);
+    // Suivre le joueur horizontalement - toujours en mouvement
+    // Plus la distance est grande, plus il accélère
+    const distFactor = Math.min(Math.abs(toPlayerX) / 80, 2.5);
+    const moveSpeed = baseSpeed * Math.max(distFactor, 0.5); // Minimum 50% de vitesse
+
+    if (Math.abs(toPlayerX) > 20) {
+      this.setBossTargetVelocity(Math.sign(toPlayerX) * moveSpeed, this.boss.targetVelY);
     } else {
-      // Au-dessus du joueur - préparation du slam
-      this.setBossTargetVelocity(0, -speed * 0.5);
+      // Au-dessus du joueur - léger mouvement pour rester menaçant
+      this.setBossTargetVelocity(Math.sin(this.time.now * 0.003) * 50, this.boss.targetVelY);
     }
 
-    // Rester dans la zone haute
-    if (this.boss.y > 280) {
-      this.setBossTargetVelocity(this.boss.targetVelX, -speed);
+    // Flotter à une hauteur au-dessus du joueur (prêt pour le slam)
+    const targetY = 160;
+    const toTargetY = targetY - this.boss.y;
+    const vertSpeed = baseSpeed * 0.6;
+
+    if (Math.abs(toTargetY) > 15) {
+      this.setBossTargetVelocity(this.boss.targetVelX, Math.sign(toTargetY) * vertSpeed);
+    } else {
+      this.setBossTargetVelocity(this.boss.targetVelX, 0);
     }
-    if (this.boss.y < 120) {
-      this.setBossTargetVelocity(this.boss.targetVelX, speed * 0.3);
+
+    // Rester dans les limites de l'arène
+    if (this.boss.x < 80) {
+      this.setBossTargetVelocity(baseSpeed, this.boss.targetVelY);
+    }
+    if (this.boss.x > this.WORLD.width - 80) {
+      this.setBossTargetVelocity(-baseSpeed, this.boss.targetVelY);
     }
   }
 
@@ -8444,6 +8770,9 @@ class GameScene extends Phaser.Scene {
 
     this.crusherSlamming = true;
 
+    // Désactiver temporairement la collision avec les bounds pour le slam
+    this.boss.body.setCollideWorldBounds(false);
+
     // SFX de préparation
     this.playSound('bossWarning');
     this.playSound('bossCharge');
@@ -8451,22 +8780,22 @@ class GameScene extends Phaser.Scene {
     // Animation de préparation (monte légèrement)
     this.tweens.add({
       targets: this.boss,
-      y: this.boss.y - 40,
-      scaleX: 0.9,
-      scaleY: 1.2,
-      duration: 600,
+      y: this.boss.y - 60,
+      scaleX: 0.85,
+      scaleY: 1.3,
+      duration: 500,
       ease: 'Quad.easeOut',
       onComplete: () => {
         if (!this.boss || !this.boss.active) return;
 
-        // SLAM DOWN!
-        const targetY = this.WORLD.groundY - 100;
+        // SLAM DOWN! - Jusqu'au sol
+        const targetY = this.WORLD.groundY - 50; // Beaucoup plus proche du sol
         this.tweens.add({
           targets: this.boss,
           y: targetY,
-          scaleX: 1.3,
-          scaleY: 0.7,
-          duration: 200,
+          scaleX: 1.4,
+          scaleY: 0.6,
+          duration: 150, // Plus rapide pour l'impact
           ease: 'Quad.easeIn',
           onComplete: () => {
             if (!this.boss || !this.boss.active) return;
@@ -8474,39 +8803,44 @@ class GameScene extends Phaser.Scene {
             // SFX d'impact dévastateur
             this.playSound('bossSlam');
 
-            // Impact au sol
-            this.cameras.main.shake(400, 0.03);
+            // Impact au sol - gros shake
+            this.cameras.main.shake(500, 0.04);
 
             // Onde de choc au sol
-            this.createCrusherShockwave(this.boss.x, targetY + 30);
+            this.createCrusherShockwave(this.boss.x, this.WORLD.groundY);
 
-            // Particules d'impact
-            this.emitParticles(this.boss.x, targetY + 30, {
-              count: 40,
+            // Particules d'impact massives
+            this.emitParticles(this.boss.x, this.WORLD.groundY - 10, {
+              count: 50,
               colors: [0x884422, 0x553311, 0xaa6633, 0xffffff],
-              minSpeed: 150,
-              maxSpeed: 350,
-              minSize: 5,
-              maxSize: 15,
-              life: 600,
+              minSpeed: 200,
+              maxSpeed: 400,
+              minSize: 6,
+              maxSize: 18,
+              life: 700,
               angle: -Math.PI / 2,
-              spread: Math.PI * 0.8,
-              gravity: 300,
+              spread: Math.PI * 0.9,
+              gravity: 400,
               fadeOut: true
             });
 
-            // Retour à la normale
-            this.time.delayedCall(400, () => {
+            // Retour à la hauteur de flottement
+            this.time.delayedCall(300, () => {
               if (this.boss && this.boss.active) {
                 this.tweens.add({
                   targets: this.boss,
                   scaleX: 1,
                   scaleY: 1,
-                  y: 200,
-                  duration: 800,
-                  ease: 'Quad.easeOut'
+                  y: 160,
+                  duration: 600,
+                  ease: 'Quad.easeOut',
+                  onComplete: () => {
+                    if (this.boss && this.boss.active) {
+                      this.boss.body.setCollideWorldBounds(true);
+                      this.crusherSlamming = false;
+                    }
+                  }
                 });
-                this.crusherSlamming = false;
               }
             });
           }
@@ -8536,7 +8870,7 @@ class GameScene extends Phaser.Scene {
       delay: 50,
       repeat: 10,
       callback: () => {
-        if (!this.player || this.isInvincible) return;
+        if (!this.player || !this.player.active || !this.player.body || this.isInvincible) return;
         const waveLeft = x - wave.scaleX * 15;
         const waveRight = x + wave.scaleX * 15;
         const playerOnGround = this.player.body.blocked.down || this.player.body.touching.down;
@@ -8550,6 +8884,7 @@ class GameScene extends Phaser.Scene {
 
   bossCrusherThrowRock() {
     if (!this.boss || !this.boss.active || this.crusherSlamming) return;
+    if (!this.player || !this.player.active) return;
 
     // Lancer un gros projectile lent
     const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
@@ -8811,7 +9146,7 @@ class GameScene extends Phaser.Scene {
           delay: 2500,
           loop: true,
           callback: () => {
-            if (!clone.active || !this.player) return;
+            if (!clone.active || !this.player || !this.player.active) return;
             const angle = Phaser.Math.Angle.Between(clone.x, clone.y, this.player.x, this.player.y);
             this.createBossBullet(clone.x, clone.y, angle, 100);
           }
@@ -8852,6 +9187,7 @@ class GameScene extends Phaser.Scene {
 
   bossPhantomShoot() {
     if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+    if (!this.player || !this.player.active) return;
 
     // Tir spectral avec trajectoire courbe
     const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
@@ -8919,6 +9255,7 @@ class GameScene extends Phaser.Scene {
 
   bossBerserkerMove() {
     if (!this.boss || !this.boss.active || this.berserkerCharging) return;
+    if (!this.player || !this.player.active) return;
 
     // Calculer le niveau de rage basé sur la santé
     this.berserkerRage = 1 - (this.bossHealth / this.bossMaxHealth);
@@ -8966,6 +9303,7 @@ class GameScene extends Phaser.Scene {
 
   bossBerserkerCharge() {
     if (!this.boss || !this.boss.active || this.berserkerCharging) return;
+    if (!this.player || !this.player.active) return;
 
     this.berserkerCharging = true;
 
@@ -9219,7 +9557,7 @@ class GameScene extends Phaser.Scene {
           delay: 2000,
           loop: true,
           callback: () => {
-            if (!turret.active || !this.player) return;
+            if (!turret.active || !this.player || !this.player.active) return;
             const angle = Phaser.Math.Angle.Between(turret.x, turret.y, this.player.x, this.player.y);
             this.createBossBullet(turret.x, turret.y - 15, angle, 120);
 
@@ -9243,6 +9581,8 @@ class GameScene extends Phaser.Scene {
 
         // Collision pour détruire la tourelle
         this.physics.add.overlap(this.player, turret, (p, t) => {
+          if (!p || !p.active || !p.body) return;
+          if (!t || !t.active) return;
           if (p.body.velocity.y > 0 && p.y < t.y - 10) {
             this.playSound('enemyKill');
             this.emitParticles(t.x, t.y, {
@@ -9258,7 +9598,7 @@ class GameScene extends Phaser.Scene {
             });
             if (t.shootTimer) t.shootTimer.remove();
             t.destroy();
-            this.architectStructures = this.architectStructures.filter(s => s.active);
+            this.architectStructures = this.architectStructures.filter(s => s && s.active);
             p.body.setVelocityY(-300);
           }
         });
@@ -9329,9 +9669,9 @@ class GameScene extends Phaser.Scene {
           delay: 50,
           repeat: 5,
           callback: () => {
-            if (!this.player || this.isInvincible) return;
+            if (!this.player || !this.player.active || this.isInvincible) return;
             if (Math.abs(this.player.y - laserY) < 20) {
-              this.takeDamage(6); // Laser de TWINS = 1.5 coeurs
+              this.takeDamage(6); // Laser ARCHITECT = 1.5 coeurs
             }
           }
         });
@@ -9472,6 +9812,7 @@ class GameScene extends Phaser.Scene {
 
   bossTwinsAttack() {
     if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+    if (!this.player || !this.player.active) return;
 
     // Attaque alternée entre les jumeaux
     const twin1Turn = Math.random() < 0.5;
@@ -9529,7 +9870,8 @@ class GameScene extends Phaser.Scene {
         delay: 50,
         repeat: 6,
         callback: () => {
-          if (!this.player || this.isInvincible) return;
+          if (!this.player || !this.player.active || this.isInvincible) return;
+          if (!this.boss || !this.boss.active || !this.twin2) return;
           // Vérifier la distance du joueur à la ligne
           const dist = this.pointToLineDistance(
             this.player.x, this.player.y,
@@ -9545,6 +9887,7 @@ class GameScene extends Phaser.Scene {
       this.time.delayedCall(350, () => linkGraphics.destroy());
 
       // Tirs simultanés
+      if (!this.player || !this.player.active) return;
       const angle1 = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
       const angle2 = Phaser.Math.Angle.Between(this.twin2.x, this.twin2.y, this.player.x, this.player.y);
 
@@ -9920,6 +10263,7 @@ class GameScene extends Phaser.Scene {
         // Dasher et Splitter : dash vers le joueur
         this.time.delayedCall(300, () => {
           if (!this.boss || !this.boss.active) return;
+          if (!this.player || !this.player.active) return;
 
           const toPlayerX = this.player.x - this.boss.x;
           const toPlayerY = this.player.y - this.boss.y;
@@ -10659,6 +11003,8 @@ class GameScene extends Phaser.Scene {
 
   hitBullet(player, bullet) {
     if (this.isInvincible) return;
+    if (!player || !player.active) return;
+    if (!bullet || !bullet.active) return;
 
     // Récupérer les dégâts du projectile (défaut: 2 = 1/2 coeur)
     const damage = bullet.damage || 2;
@@ -10758,12 +11104,16 @@ class GameScene extends Phaser.Scene {
       repeat: 5,
       onComplete: () => {
         this.isInvincible = false;
-        this.player.alpha = 1;
+        if (this.player && this.player.active) {
+          this.player.alpha = 1;
+        }
       }
     });
 
-    const knockbackDir = this.player.body.velocity.x >= 0 ? -1 : 1;
-    this.player.body.setVelocity(knockbackDir * 200, -200);
+    if (this.player && this.player.body) {
+      const knockbackDir = this.player.body.velocity.x >= 0 ? -1 : 1;
+      this.player.body.setVelocity(knockbackDir * 200, -200);
+    }
   }
 
   collectCoin(player, coin) {
@@ -10870,6 +11220,13 @@ class GameScene extends Phaser.Scene {
       this.stopMusic();
       localStorage.removeItem('platformer-checkpoint'); // Effacer le checkpoint
       this.scene.restart({ level: 1, score: 0, totalTime: 0, maxHealth: 3, currentHealth: 12 });
+      return;
+    }
+
+    // Retour au menu (M ou ESC)
+    if (Phaser.Input.Keyboard.JustDown(this.keys.m) || Phaser.Input.Keyboard.JustDown(this.keys.esc)) {
+      this.stopMusic();
+      this.scene.start('MenuScene');
       return;
     }
 
@@ -11064,40 +11421,13 @@ class GameScene extends Phaser.Scene {
       this.isClimbing = false;
     }
 
-    // === CROUCH (SE BAISSER) ===
-    const wasCrouching = this.isCrouching;
-    if (down && onGround && !this.isDashing && !this.isClimbing) {
-      // Se baisser
-      if (!this.isCrouching) {
-        this.isCrouching = true;
-        // Réduire la hitbox (hauteur divisée par 2)
-        body.setSize(14, 13);
-        body.setOffset(1, 14); // Décaler vers le bas pour rester au sol
-        // Effet visuel de squash
-        this.playerScaleX = 1.3;
-        this.playerScaleY = 0.5;
-      }
-    } else {
-      // Se relever
-      if (this.isCrouching) {
-        this.isCrouching = false;
-        // Restaurer la hitbox normale
-        body.setSize(14, 26);
-        body.setOffset(1, 1);
-        // Effet visuel de stretch au relevé
-        this.playerScaleX = 0.8;
-        this.playerScaleY = 1.2;
-      }
-    }
-
     // === MOUVEMENT HORIZONTAL ===
     if (!this.isDashing) {
       const currentVelX = body.velocity.x;
       const inAir = !onGround;
       let accel = inAir ? cfg.airAccel : cfg.playerAccel;
       const decel = inAir ? cfg.airDecel : cfg.playerDecel;
-      // Vitesse réduite quand accroupi
-      const maxSpeed = this.isCrouching ? cfg.playerSpeed * 0.4 : cfg.playerSpeed;
+      const maxSpeed = cfg.playerSpeed;
 
       // Turn-around boost: accélération augmentée quand on change de direction
       // C'est ce qui rend le contrôle "snappy" dans les jeux AAA
@@ -11870,7 +12200,7 @@ const config = {
       tileBias: 16
     }
   },
-  scene: GameScene,
+  scene: [MenuScene, GameScene],
   pixelArt: true,
   antialias: false,
   roundPixels: true
