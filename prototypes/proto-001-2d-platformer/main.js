@@ -658,20 +658,20 @@ class GameScene extends Phaser.Scene {
         break;
       }
       case 'key': {
-        // Clé - son magique ascendant
-        for (let i = 0; i < 4; i++) {
+        // Clé - son subtil et satisfaisant (pas trop fort)
+        for (let i = 0; i < 2; i++) {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'sine';
-          const freq = 440 * Math.pow(1.25, i);
-          const delay = i * 0.08;
+          const freq = 600 * Math.pow(1.2, i);
+          const delay = i * 0.06;
           osc.frequency.setValueAtTime(freq, now + delay);
           gain.gain.setValueAtTime(0, now);
-          gain.gain.linearRampToValueAtTime(volume * 0.2, now + delay);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.15);
+          gain.gain.linearRampToValueAtTime(volume * 0.1, now + delay);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.1);
           osc.connect(gain).connect(ctx.destination);
           osc.start(now + delay);
-          osc.stop(now + delay + 0.15);
+          osc.stop(now + delay + 0.1);
         }
         break;
       }
@@ -793,6 +793,107 @@ class GameScene extends Phaser.Scene {
         });
         break;
       }
+      case 'bossHurtCry': {
+        // Cri de douleur du boss - son grave et distordu
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const osc3 = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const distortion = ctx.createWaveShaper();
+
+        // Créer une courbe de distortion
+        const curve = new Float32Array(256);
+        for (let i = 0; i < 256; i++) {
+          const x = (i / 128) - 1;
+          curve[i] = Math.tanh(x * 3);
+        }
+        distortion.curve = curve;
+
+        // Oscillateurs pour le cri
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(150, now);
+        osc1.frequency.exponentialRampToValueAtTime(80, now + 0.3);
+
+        osc2.type = 'square';
+        osc2.frequency.setValueAtTime(120, now);
+        osc2.frequency.exponentialRampToValueAtTime(60, now + 0.25);
+
+        // Vibrato pour effet de tremblement
+        osc3.type = 'sine';
+        osc3.frequency.setValueAtTime(25, now);
+        const vibratoGain = ctx.createGain();
+        vibratoGain.gain.setValueAtTime(20, now);
+        osc3.connect(vibratoGain);
+        vibratoGain.connect(osc1.frequency);
+
+        gain.gain.setValueAtTime(volume * 0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+        osc1.connect(distortion);
+        osc2.connect(distortion);
+        distortion.connect(gain).connect(ctx.destination);
+
+        osc1.start(now);
+        osc1.stop(now + 0.35);
+        osc2.start(now);
+        osc2.stop(now + 0.35);
+        osc3.start(now);
+        osc3.stop(now + 0.35);
+        break;
+      }
+      case 'bossDeathCry': {
+        // Cri de mort du boss - long et dramatique
+        const duration = 1.5;
+
+        // Plusieurs couches de son pour un effet épique
+        for (let layer = 0; layer < 3; layer++) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc.type = layer === 0 ? 'sawtooth' : (layer === 1 ? 'square' : 'triangle');
+
+          // Descente dramatique de fréquence
+          const baseFreq = 200 - layer * 40;
+          osc.frequency.setValueAtTime(baseFreq, now + layer * 0.1);
+          osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.3, now + duration);
+
+          gain.gain.setValueAtTime(volume * (0.3 - layer * 0.05), now + layer * 0.1);
+          gain.gain.linearRampToValueAtTime(volume * 0.4, now + 0.3);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(now + layer * 0.1);
+          osc.stop(now + duration);
+        }
+
+        // Ajout d'un effet de "bruit" qui s'estompe
+        const noise = ctx.createOscillator();
+        const noiseGain = ctx.createGain();
+        noise.type = 'sawtooth';
+        noise.frequency.setValueAtTime(80, now);
+        noise.frequency.setValueAtTime(40, now + 0.5);
+        noise.frequency.setValueAtTime(20, now + 1.0);
+        noiseGain.gain.setValueAtTime(volume * 0.15, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+        noise.connect(noiseGain).connect(ctx.destination);
+        noise.start(now);
+        noise.stop(now + duration);
+
+        // Réverbération simulée avec échos
+        for (let echo = 1; echo <= 3; echo++) {
+          const echoOsc = ctx.createOscillator();
+          const echoGain = ctx.createGain();
+          echoOsc.type = 'sine';
+          echoOsc.frequency.setValueAtTime(100 / echo, now + echo * 0.2);
+          echoOsc.frequency.exponentialRampToValueAtTime(30, now + duration + echo * 0.1);
+          echoGain.gain.setValueAtTime(volume * (0.1 / echo), now + echo * 0.2);
+          echoGain.gain.exponentialRampToValueAtTime(0.01, now + duration + echo * 0.1);
+          echoOsc.connect(echoGain).connect(ctx.destination);
+          echoOsc.start(now + echo * 0.2);
+          echoOsc.stop(now + duration + echo * 0.1);
+        }
+        break;
+      }
       case 'door': {
         // Porte - son de progression
         const osc = ctx.createOscillator();
@@ -865,6 +966,208 @@ class GameScene extends Phaser.Scene {
         osc.stop(now + 0.3);
         break;
       }
+      case 'bossDash': {
+        // Charge de boss - whoosh puissant avec grondement
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const osc3 = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(3000, now);
+        filter.frequency.exponentialRampToValueAtTime(200, now + 0.4);
+
+        // Grondement grave
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(80, now);
+        osc1.frequency.exponentialRampToValueAtTime(40, now + 0.35);
+
+        // Whoosh aigu
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(400, now);
+        osc2.frequency.exponentialRampToValueAtTime(150, now + 0.3);
+
+        // Sub bass impact
+        osc3.type = 'sine';
+        osc3.frequency.setValueAtTime(60, now);
+        osc3.frequency.exponentialRampToValueAtTime(30, now + 0.4);
+
+        gain.gain.setValueAtTime(volume * 0.45, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+        osc1.connect(filter);
+        osc2.connect(filter);
+        osc3.connect(gain);
+        filter.connect(gain).connect(ctx.destination);
+
+        osc1.start(now);
+        osc1.stop(now + 0.4);
+        osc2.start(now);
+        osc2.stop(now + 0.35);
+        osc3.start(now);
+        osc3.stop(now + 0.4);
+        break;
+      }
+      case 'bossBullet': {
+        // Tir de boss - son énergétique
+        const osc = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.exponentialRampToValueAtTime(150, now + 0.12);
+
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(800, now);
+        osc2.frequency.exponentialRampToValueAtTime(200, now + 0.1);
+
+        gain.gain.setValueAtTime(volume * 0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+
+        osc.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.12);
+        osc2.start(now);
+        osc2.stop(now + 0.12);
+        break;
+      }
+      case 'bossCharge': {
+        // Wind-up de charge - montée de tension
+        const osc = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(60, now);
+        osc.frequency.exponentialRampToValueAtTime(200, now + 0.6);
+
+        // Tremblement
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(15, now);
+        const vibratoGain = ctx.createGain();
+        vibratoGain.gain.setValueAtTime(30, now);
+        vibratoGain.gain.linearRampToValueAtTime(80, now + 0.6);
+        osc2.connect(vibratoGain);
+        vibratoGain.connect(osc.frequency);
+
+        gain.gain.setValueAtTime(volume * 0.15, now);
+        gain.gain.linearRampToValueAtTime(volume * 0.4, now + 0.6);
+
+        osc.connect(gain).connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.65);
+        osc2.start(now);
+        osc2.stop(now + 0.65);
+        break;
+      }
+      case 'bossSlam': {
+        // Impact au sol - boom dévastateur
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const noise = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        // Impact principal
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(100, now);
+        osc1.frequency.exponentialRampToValueAtTime(20, now + 0.4);
+
+        // Harmonique
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(50, now);
+        osc2.frequency.exponentialRampToValueAtTime(15, now + 0.3);
+
+        // Bruit d'impact
+        noise.type = 'sawtooth';
+        noise.frequency.setValueAtTime(30, now);
+
+        gain.gain.setValueAtTime(volume * 0.5, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        noise.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc1.start(now);
+        osc1.stop(now + 0.4);
+        osc2.start(now);
+        osc2.stop(now + 0.35);
+        noise.start(now);
+        noise.stop(now + 0.15);
+        break;
+      }
+      case 'bossRoar': {
+        // Rugissement de boss - intimidant
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const osc3 = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const distortion = ctx.createWaveShaper();
+
+        const curve = new Float32Array(256);
+        for (let i = 0; i < 256; i++) {
+          const x = (i / 128) - 1;
+          curve[i] = Math.tanh(x * 4);
+        }
+        distortion.curve = curve;
+
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(100, now);
+        osc1.frequency.linearRampToValueAtTime(150, now + 0.15);
+        osc1.frequency.exponentialRampToValueAtTime(60, now + 0.5);
+
+        osc2.type = 'square';
+        osc2.frequency.setValueAtTime(70, now);
+        osc2.frequency.exponentialRampToValueAtTime(40, now + 0.5);
+
+        // Vibrato intense
+        osc3.type = 'sine';
+        osc3.frequency.setValueAtTime(20, now);
+        osc3.frequency.linearRampToValueAtTime(8, now + 0.5);
+        const vibratoGain = ctx.createGain();
+        vibratoGain.gain.setValueAtTime(25, now);
+        osc3.connect(vibratoGain);
+        vibratoGain.connect(osc1.frequency);
+
+        gain.gain.setValueAtTime(volume * 0.45, now);
+        gain.gain.linearRampToValueAtTime(volume * 0.5, now + 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
+
+        osc1.connect(distortion);
+        osc2.connect(distortion);
+        distortion.connect(gain).connect(ctx.destination);
+
+        osc1.start(now);
+        osc1.stop(now + 0.55);
+        osc2.start(now);
+        osc2.stop(now + 0.55);
+        osc3.start(now);
+        osc3.stop(now + 0.55);
+        break;
+      }
+      case 'bossWarning': {
+        // Avertissement d'attaque - signal d'alarme court
+        for (let i = 0; i < 2; i++) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(600, now + i * 0.12);
+          osc.frequency.setValueAtTime(400, now + i * 0.12 + 0.05);
+          gain.gain.setValueAtTime(volume * 0.25, now + i * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.12 + 0.1);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(now + i * 0.12);
+          osc.stop(now + i * 0.12 + 0.1);
+        }
+        break;
+      }
     }
   }
 
@@ -889,11 +1192,17 @@ class GameScene extends Phaser.Scene {
 
       const musicFiles = {
         'level': 'music/bgm.mp3',
+        'low': 'music/low.mp3', // Ambient calme après victoire boss
         'boss1': 'music/bgm_charger.mp3',
         'boss2': 'music/bgm_spinner.mp3',
         'boss3': 'music/bgm_splitter.mp3',
         'boss4': 'music/bgm_guardian.mp3',
-        'boss5': 'music/bgm_summoner.mp3'
+        'boss5': 'music/bgm_summoner.mp3',
+        'boss6': 'music/bgm_crusher.mp3',
+        'boss7': 'music/bgm_phantom.mp3',
+        'boss8': 'music/bgm_berserker.mp3',
+        'boss9': 'music/bgm_architect.mp3',
+        'boss10': 'music/bgm_twins.mp3'
       };
 
       // Charger toutes les pistes une seule fois
@@ -980,7 +1289,7 @@ class GameScene extends Phaser.Scene {
     }, stepTime);
   }
 
-  fadeOutTrack(track, duration) {
+  fadeOutTrack(track, duration, pauseAfter = true) {
     const startVolume = track.volume;
     const steps = 20;
     const stepTime = duration / steps;
@@ -992,10 +1301,147 @@ class GameScene extends Phaser.Scene {
       track.volume = Math.max(0, startVolume - volumeStep * currentStep);
       if (currentStep >= steps) {
         clearInterval(fadeInterval);
-        track.pause();
-        track.currentTime = 0;
+        if (pauseAfter) {
+          track.pause();
+          track.currentTime = 0;
+        }
       }
     }, stepTime);
+  }
+
+  // Fondu croisé entre deux pistes
+  crossfadeTo(newTrackKey, fadeOutDuration = 500, fadeInDuration = 500) {
+    const newTrack = this.musicTracks[newTrackKey];
+    if (!newTrack) return;
+
+    // Fade out de la piste actuelle
+    if (this.currentTrack && !this.currentTrack.paused) {
+      this.fadeOutTrack(this.currentTrack, fadeOutDuration);
+    }
+
+    // Fade in de la nouvelle piste après un petit délai
+    setTimeout(() => {
+      newTrack.currentTime = 0;
+      newTrack.volume = 0;
+      this.currentTrack = newTrack;
+      this.currentMusicType = newTrackKey;
+      this.musicPlaying = true;
+
+      if (window.gameMusic) {
+        window.gameMusic.currentTrack = newTrack;
+        window.gameMusic.currentType = newTrackKey;
+      }
+
+      newTrack.play().catch(e => {});
+      this.fadeInTrack(newTrack, fadeInDuration);
+    }, fadeOutDuration * 0.5); // Commence le fade in à mi-chemin
+  }
+
+  // Démarrer l'ambiance calme après victoire boss
+  startPostBossAmbient() {
+    this.isInPostBossAmbient = true;
+
+    // Fade in lent de low.mp3
+    const lowTrack = this.musicTracks['low'];
+    if (!lowTrack) return;
+
+    lowTrack.currentTime = 0;
+    lowTrack.volume = 0;
+    this.currentTrack = lowTrack;
+    this.currentMusicType = 'low';
+    this.musicPlaying = true;
+
+    if (window.gameMusic) {
+      window.gameMusic.currentTrack = lowTrack;
+      window.gameMusic.currentType = 'low';
+    }
+
+    lowTrack.play().catch(e => {});
+
+    // Fade in très lent (3 secondes)
+    this.fadeInTrack(lowTrack, 3000);
+  }
+
+  // Transition de l'ambiance vers la musique normale (quand le joueur quitte l'arène)
+  transitionToLevelMusic() {
+    if (!this.isInPostBossAmbient) return;
+
+    this.isInPostBossAmbient = false;
+
+    // Fondu croisé: fade out rapide de low, fade in de level
+    this.crossfadeTo('level', 800, 1000);
+  }
+
+  // Démarrer une piste INSTANTANÉMENT (sans fondu) - pour musique de boss
+  playMusicInstant(trackKey) {
+    const track = this.musicTracks[trackKey];
+    if (!track) return;
+
+    // Arrêter toutes les autres pistes instantanément
+    Object.entries(this.musicTracks).forEach(([key, otherTrack]) => {
+      if (key !== trackKey && !otherTrack.paused) {
+        otherTrack.pause();
+        otherTrack.currentTime = 0;
+      }
+    });
+
+    // Jouer la nouvelle piste à plein volume immédiatement
+    track.currentTime = 0;
+    track.volume = this.musicVolume;
+    this.currentTrack = track;
+    this.currentMusicType = trackKey;
+    this.musicPlaying = true;
+
+    if (window.gameMusic) {
+      window.gameMusic.currentTrack = track;
+      window.gameMusic.currentType = trackKey;
+    }
+
+    track.play().catch(e => {
+      this.pendingMusic = trackKey;
+    });
+  }
+
+  // Arrêter la musique INSTANTANÉMENT (sans fondu) - pour fin de combat boss
+  stopMusicInstant() {
+    this.musicPlaying = false;
+    this.pendingBossMusic = null;
+    this.pendingMusic = null;
+
+    // Arrêter la piste audio externe instantanément
+    if (this.currentTrack) {
+      this.currentTrack.pause();
+      this.currentTrack.currentTime = 0;
+      this.currentTrack = null;
+    }
+
+    this.currentMusicType = null;
+
+    // Mettre à jour l'état global
+    if (window.gameMusic) {
+      window.gameMusic.currentTrack = null;
+      window.gameMusic.currentType = null;
+      window.gameMusic.isPlaying = false;
+    }
+
+    // Arrêter les éléments synthétiques (fallback)
+    if (this.musicIntervals) {
+      this.musicIntervals.forEach(interval => {
+        try { clearInterval(interval); } catch (e) {}
+      });
+      this.musicIntervals = [];
+    }
+    if (this.musicNodes) {
+      this.musicNodes.forEach(node => {
+        try { if (node && node.stop) node.stop(0); } catch (e) {}
+        try { if (node && node.disconnect) node.disconnect(); } catch (e) {}
+      });
+      this.musicNodes = [];
+    }
+    if (this.musicMasterGain) {
+      try { this.musicMasterGain.disconnect(); } catch (e) {}
+      this.musicMasterGain = null;
+    }
   }
 
   stopMusic() {
@@ -1048,9 +1494,9 @@ class GameScene extends Phaser.Scene {
 
 
   startBossMusic(bossType) {
-    // Utiliser les fichiers audio externes
+    // Utiliser les fichiers audio externes - démarrage INSTANTANÉ (sans fondu)
     const trackKey = `boss${bossType}`;
-    this.playMusicTrack(trackKey);
+    this.playMusicInstant(trackKey);
   }
 
   // CHARGER: Agressif, tempo rapide, beats durs
@@ -1569,31 +2015,76 @@ class GameScene extends Phaser.Scene {
   }
 
   particleCoin(x, y) {
-    // === EFFET TRIPLE A - PIÈCE ===
+    // === EFFET PIÈCE - Sobre et efficace ===
 
-    // Layer 1: Flash lumineux central
+    // Flash lumineux subtil
     this.emitParticles(x, y, {
       count: 1,
-      colors: [0xffffff],
+      colors: [0xffd700],
       minSpeed: 0,
       maxSpeed: 0,
-      minSize: 30,
-      maxSize: 40,
-      life: 150,
+      minSize: 20,
+      maxSize: 25,
+      life: 120,
       fadeOut: true,
       shape: 'circle'
     });
 
-    // Layer 2: Anneau d'expansion
-    for (let i = 0; i < 12; i++) {
-      const angle = (Math.PI * 2 / 12) * i;
+    // Particules dorées qui s'élèvent
+    this.emitParticles(x, y, {
+      count: 6,
+      colors: [0xffd700, 0xffaa00],
+      minSpeed: 40,
+      maxSpeed: 80,
+      minSize: 2,
+      maxSize: 4,
+      life: 300,
+      spread: Math.PI * 0.5,
+      angle: -Math.PI / 2,
+      gravity: -50,
+      fadeOut: true
+    });
+
+    // Quelques étincelles
+    this.emitParticles(x, y, {
+      count: 4,
+      colors: [0xffffcc, 0xffffff],
+      minSpeed: 20,
+      maxSpeed: 50,
+      minSize: 1,
+      maxSize: 2,
+      life: 250,
+      spread: Math.PI * 2,
+      fadeOut: true
+    });
+  }
+
+  particleKey(x, y) {
+    // === EFFET CLÉ - Sobre et satisfaisant ===
+
+    // Flash lumineux doré
+    this.emitParticles(x, y, {
+      count: 1,
+      colors: [0xffd700],
+      minSpeed: 0,
+      maxSpeed: 0,
+      minSize: 35,
+      maxSize: 40,
+      life: 180,
+      fadeOut: true,
+      shape: 'circle'
+    });
+
+    // Rayons qui partent du centre
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI * 2 / 6) * i;
       this.emitParticles(x, y, {
-        count: 1,
-        colors: [0xffd700],
-        minSpeed: 80,
-        maxSpeed: 100,
-        minSize: 4,
-        maxSize: 6,
+        count: 2,
+        colors: [0xffd700, 0xffaa00],
+        minSpeed: 60,
+        maxSpeed: 120,
+        minSize: 3,
+        maxSize: 5,
         life: 300,
         spread: 0.1,
         angle: angle,
@@ -1601,165 +2092,20 @@ class GameScene extends Phaser.Scene {
       });
     }
 
-    // Layer 3: Étoiles dorées montantes
+    // Particules dorées montantes
     this.emitParticles(x, y, {
-      count: 8,
-      colors: [0xffd700, 0xffee00, 0xffffaa],
-      minSpeed: 60,
-      maxSpeed: 120,
-      minSize: 3,
-      maxSize: 7,
-      life: 500,
+      count: 10,
+      colors: [0xffd700, 0xffcc00, 0xffffff],
+      minSpeed: 50,
+      maxSpeed: 100,
+      minSize: 2,
+      maxSize: 5,
+      life: 400,
       spread: Math.PI * 0.6,
       angle: -Math.PI / 2,
-      gravity: -80,
-      fadeOut: true,
-      shrink: true,
-      shape: 'star'
+      gravity: -60,
+      fadeOut: true
     });
-
-    // Layer 4: Étincelles scintillantes
-    this.emitParticles(x, y, {
-      count: 15,
-      colors: [0xffffcc, 0xffffff, 0xffeedd],
-      minSpeed: 30,
-      maxSpeed: 80,
-      minSize: 1,
-      maxSize: 3,
-      life: 600,
-      spread: Math.PI * 2,
-      gravity: -30,
-      fadeOut: true,
-      twinkle: true
-    });
-
-    // Layer 5: Traînée de poussière d'or
-    for (let i = 0; i < 3; i++) {
-      this.time.delayedCall(i * 50, () => {
-        this.emitParticles(x, y - i * 15, {
-          count: 4,
-          colors: [0xffd700, 0xffaa00],
-          minSpeed: 10,
-          maxSpeed: 30,
-          minSize: 2,
-          maxSize: 4,
-          life: 400,
-          spread: Math.PI,
-          angle: -Math.PI / 2,
-          gravity: 50,
-          fadeOut: true
-        });
-      });
-    }
-  }
-
-  particleKey(x, y) {
-    // === EFFET TRIPLE A - CLÉ ===
-
-    // Layer 1: Explosion de lumière centrale
-    this.emitParticles(x, y, {
-      count: 1,
-      colors: [0xffffff],
-      minSpeed: 0,
-      maxSpeed: 0,
-      minSize: 50,
-      maxSize: 60,
-      life: 200,
-      fadeOut: true,
-      shape: 'circle'
-    });
-
-    // Layer 2: Seconde vague de lumière
-    this.time.delayedCall(50, () => {
-      this.emitParticles(x, y, {
-        count: 1,
-        colors: [0xffd700],
-        minSpeed: 0,
-        maxSpeed: 0,
-        minSize: 70,
-        maxSize: 80,
-        life: 300,
-        fadeOut: true,
-        shape: 'circle'
-      });
-    });
-
-    // Layer 3: Rayons solaires
-    for (let i = 0; i < 8; i++) {
-      const angle = (Math.PI * 2 / 8) * i;
-      this.emitParticles(x, y, {
-        count: 3,
-        colors: [0xffd700, 0xffcc00],
-        minSpeed: 100,
-        maxSpeed: 200,
-        minSize: 4,
-        maxSize: 8,
-        life: 400,
-        spread: 0.15,
-        angle: angle,
-        fadeOut: true,
-        shrink: true
-      });
-    }
-
-    // Layer 4: Grande explosion d'étoiles
-    this.emitParticles(x, y, {
-      count: 25,
-      colors: [0xffd700, 0xffcc00, 0xffffaa, 0xffffff],
-      minSpeed: 80,
-      maxSpeed: 200,
-      minSize: 4,
-      maxSize: 10,
-      life: 700,
-      spread: Math.PI * 2,
-      gravity: -100,
-      fadeOut: true,
-      shrink: true,
-      shape: 'star'
-    });
-
-    // Layer 5: Spirale ascendante
-    for (let i = 0; i < 20; i++) {
-      this.time.delayedCall(i * 30, () => {
-        const spiralAngle = (i / 20) * Math.PI * 4;
-        const radius = 10 + i * 3;
-        const px = x + Math.cos(spiralAngle) * radius;
-        const py = y - i * 8;
-        this.emitParticles(px, py, {
-          count: 2,
-          colors: [0xffffaa, 0xffffff],
-          minSpeed: 5,
-          maxSpeed: 20,
-          minSize: 2,
-          maxSize: 5,
-          life: 400,
-          spread: Math.PI * 2,
-          fadeOut: true,
-          shape: 'star'
-        });
-      });
-    }
-
-    // Layer 6: Pluie d'étincelles dorées
-    this.time.delayedCall(100, () => {
-      this.emitParticles(x, y - 30, {
-        count: 30,
-        colors: [0xffd700, 0xffee00, 0xffffcc],
-        minSpeed: 20,
-        maxSpeed: 60,
-        minSize: 1,
-        maxSize: 3,
-        life: 800,
-        spread: Math.PI * 0.8,
-        angle: Math.PI / 2,
-        gravity: 100,
-        fadeOut: true,
-        twinkle: true
-      });
-    });
-
-    // Screen shake léger pour l'impact
-    this.cameras.main.shake(150, 0.005);
   }
 
   particleHeart(x, y) {
@@ -1967,6 +2313,187 @@ class GameScene extends Phaser.Scene {
     this.add.text(padding, vh - padding, 'ZQSD + ESPACE | R = Reset', {
       ...textStyle, fontSize: '9px', fill: '#444444'
     }).setOrigin(0, 1).setScrollFactor(0).setDepth(uiDepth + 1);
+
+    // === EFFETS VISUELS POST-PROCESS ===
+    this.setupVisualEffects();
+  }
+
+  // ==========================================
+  // EFFETS VISUELS (Vignette + Aberration Chromatique)
+  // ==========================================
+  setupVisualEffects() {
+    const vw = 960;
+    const vh = 540;
+    const effectDepth = 95; // Juste sous l'UI
+
+    // === VIGNETTE ===
+    // Créer une vignette avec un graphics object (gradient radial simulé)
+    this.vignetteGraphics = this.add.graphics();
+    this.vignetteGraphics.setScrollFactor(0);
+    this.vignetteGraphics.setDepth(effectDepth);
+    this.vignetteAlpha = 0;
+    this.vignetteTargetAlpha = 0;
+    this.vignetteColor = 0x000000;
+
+    // Dessiner la vignette (anneaux concentriques)
+    this.drawVignette(0);
+
+    // === ABERRATION CHROMATIQUE ===
+    // Overlays colorés décalés (rouge et cyan)
+    this.chromaRed = this.add.rectangle(vw / 2, vh / 2, vw + 20, vh + 20, 0xff0000, 0);
+    this.chromaRed.setScrollFactor(0);
+    this.chromaRed.setDepth(effectDepth - 1);
+    this.chromaRed.setBlendMode(Phaser.BlendModes.ADD);
+
+    this.chromaCyan = this.add.rectangle(vw / 2, vh / 2, vw + 20, vh + 20, 0x00ffff, 0);
+    this.chromaCyan.setScrollFactor(0);
+    this.chromaCyan.setDepth(effectDepth - 1);
+    this.chromaCyan.setBlendMode(Phaser.BlendModes.ADD);
+
+    this.chromaIntensity = 0;
+    this.chromaOffset = 0;
+  }
+
+  drawVignette(intensity) {
+    const vw = 960;
+    const vh = 540;
+    const cx = vw / 2;
+    const cy = vh / 2;
+    const maxRadius = Math.sqrt(cx * cx + cy * cy);
+
+    this.vignetteGraphics.clear();
+
+    if (intensity <= 0) return;
+
+    // Dessiner des anneaux concentriques pour simuler un gradient radial
+    const numRings = 15;
+    for (let i = numRings; i >= 0; i--) {
+      const ratio = i / numRings;
+      const radius = maxRadius * (0.4 + ratio * 0.6); // Commence à 40% du rayon
+      const alpha = (1 - ratio) * intensity * 0.8; // Plus opaque vers les bords
+
+      if (alpha > 0.01) {
+        this.vignetteGraphics.fillStyle(this.vignetteColor, alpha);
+        this.vignetteGraphics.fillRect(0, 0, vw, vh);
+
+        // Découper un cercle au centre (simuler vignette)
+        this.vignetteGraphics.fillStyle(0x000000, 0);
+        // On ne peut pas vraiment faire un "trou", donc on superpose des rectangles opaques sur les bords
+      }
+    }
+
+    // Approche simplifiée: dessiner des bords sombres
+    this.vignetteGraphics.clear();
+    const gradient = 20;
+    for (let i = 0; i < gradient; i++) {
+      const alpha = (i / gradient) * intensity * 0.6;
+      const offset = i * 8;
+
+      this.vignetteGraphics.fillStyle(this.vignetteColor, alpha);
+      // Bord gauche
+      this.vignetteGraphics.fillRect(0, 0, offset, vh);
+      // Bord droit
+      this.vignetteGraphics.fillRect(vw - offset, 0, offset, vh);
+      // Bord haut
+      this.vignetteGraphics.fillRect(0, 0, vw, offset);
+      // Bord bas
+      this.vignetteGraphics.fillRect(0, vh - offset, vw, offset);
+    }
+
+    // Coins plus sombres
+    const cornerSize = 150 * intensity;
+    const cornerAlpha = intensity * 0.4;
+    this.vignetteGraphics.fillStyle(this.vignetteColor, cornerAlpha);
+    this.vignetteGraphics.fillTriangle(0, 0, cornerSize, 0, 0, cornerSize);
+    this.vignetteGraphics.fillTriangle(vw, 0, vw - cornerSize, 0, vw, cornerSize);
+    this.vignetteGraphics.fillTriangle(0, vh, cornerSize, vh, 0, vh - cornerSize);
+    this.vignetteGraphics.fillTriangle(vw, vh, vw - cornerSize, vh, vw, vh - cornerSize);
+  }
+
+  // Effet de vignette (utilisé avec parcimonie)
+  pulseVignette(intensity = 0.5, duration = 300, color = 0x000000) {
+    this.vignetteColor = color;
+    this.drawVignette(intensity);
+
+    // Fade out progressif
+    this.tweens.add({
+      targets: this,
+      vignetteAlpha: { from: intensity, to: 0 },
+      duration: duration,
+      ease: 'Quad.easeOut',
+      onUpdate: () => {
+        this.drawVignette(this.vignetteAlpha);
+      }
+    });
+  }
+
+  // Vignette persistante (pour santé basse)
+  setVignettePersistent(intensity, color = 0x000000) {
+    this.vignetteColor = color;
+    this.vignetteTargetAlpha = intensity;
+  }
+
+  // Aberration chromatique (utilisée avec parcimonie)
+  pulseChromatic(intensity = 0.15, offsetPixels = 4, duration = 200) {
+    if (this.chromaTween) this.chromaTween.stop();
+
+    const vw = 960;
+    const vh = 540;
+
+    // Décaler les overlays
+    this.chromaRed.setPosition(vw / 2 - offsetPixels, vh / 2);
+    this.chromaCyan.setPosition(vw / 2 + offsetPixels, vh / 2);
+    this.chromaRed.setAlpha(intensity);
+    this.chromaCyan.setAlpha(intensity);
+
+    // Fade out
+    this.chromaTween = this.tweens.add({
+      targets: [this.chromaRed, this.chromaCyan],
+      alpha: 0,
+      duration: duration,
+      ease: 'Quad.easeOut'
+    });
+  }
+
+  // Effet combiné pour les dégâts
+  damageVisualEffect() {
+    // Vignette rouge
+    this.pulseVignette(0.4, 400, 0x330000);
+    // Légère aberration chromatique
+    this.pulseChromatic(0.08, 3, 250);
+  }
+
+  // Effet pour les coups sur le boss
+  bossHitVisualEffect() {
+    // Légère aberration chromatique seulement
+    this.pulseChromatic(0.06, 2, 150);
+  }
+
+  // Effet pour la mort du boss
+  bossDeathVisualEffect() {
+    // Vignette blanche dramatique
+    this.pulseVignette(0.6, 2000, 0x000000);
+    // Forte aberration chromatique
+    this.pulseChromatic(0.2, 6, 800);
+  }
+
+  // Mise à jour des effets visuels (appelée dans update)
+  updateVisualEffects(delta) {
+    // Vignette persistante pour santé basse
+    const healthPercent = this.playerHealth / (this.maxHealth * 4);
+    if (healthPercent <= 0.25 && healthPercent > 0) {
+      // Pulsation de vignette rouge quand vie basse
+      const pulse = Math.sin(this.time.now / 500) * 0.1 + 0.3;
+      this.setVignettePersistent(pulse * (1 - healthPercent * 4), 0x220000);
+    } else {
+      this.setVignettePersistent(0);
+    }
+
+    // Interpoler vers la vignette cible
+    if (Math.abs(this.vignetteAlpha - this.vignetteTargetAlpha) > 0.01) {
+      this.vignetteAlpha += (this.vignetteTargetAlpha - this.vignetteAlpha) * 0.1;
+      this.drawVignette(this.vignetteAlpha);
+    }
   }
 
   createKeySprite(x, y, skipAnimation = false) {
@@ -2685,13 +3212,14 @@ class GameScene extends Phaser.Scene {
   }
 
   createPatrolEnemy(x, y, minX, maxX, forceType = null) {
-    // Types d'ennemis avec formes géométriques
+    // Types d'ennemis avec formes géométriques et dégâts de contact
+    // contactDamage: 1 = 1/4 coeur, 2 = 1/2 coeur, 3 = 3/4 coeur, 4 = 1 coeur
     const enemyTypes = [
-      { shape: 'rect', w: 32, h: 32, color: 0xff4444, stroke: 0xcc2222, speed: 1.0, name: 'basic' },      // Carré rouge (1 tile)
-      { shape: 'rect', w: 32, h: 48, color: 0xff6644, stroke: 0xcc4422, speed: 1.3, name: 'tall' },       // Grand orange (1x1.5 tiles)
-      { shape: 'rect', w: 32, h: 16, color: 0xcc4466, stroke: 0x992244, speed: 0.7, name: 'wide' },       // Large plat (1x0.5 tile)
-      { shape: 'triangle', w: 32, h: 32, color: 0xff2266, stroke: 0xcc0044, speed: 1.1, name: 'spike' },  // Triangle pointu
-      { shape: 'circle', r: 16, color: 0xff5500, stroke: 0xcc3300, speed: 1.4, name: 'fast' },            // Cercle rapide
+      { shape: 'rect', w: 32, h: 32, color: 0xff4444, stroke: 0xcc2222, speed: 1.0, name: 'basic', contactDamage: 3 },      // Carré rouge - 3/4 coeur
+      { shape: 'rect', w: 32, h: 48, color: 0xff6644, stroke: 0xcc4422, speed: 1.3, name: 'tall', contactDamage: 4 },       // Grand orange - 1 coeur
+      { shape: 'rect', w: 32, h: 16, color: 0xcc4466, stroke: 0x992244, speed: 0.7, name: 'wide', contactDamage: 2 },       // Large plat - 1/2 coeur
+      { shape: 'triangle', w: 32, h: 32, color: 0xff2266, stroke: 0xcc0044, speed: 1.1, name: 'spike', contactDamage: 4 },  // Triangle pointu - 1 coeur
+      { shape: 'circle', r: 16, color: 0xff5500, stroke: 0xcc3300, speed: 1.4, name: 'fast', contactDamage: 2 },            // Cercle rapide - 1/2 coeur
     ];
 
     // Sélection du type selon le niveau ou forcé
@@ -2719,30 +3247,32 @@ class GameScene extends Phaser.Scene {
     enemy.patrolMax = maxX;
     enemy.speedMultiplier = type.speed;
     enemy.enemyType = type.name;
+    enemy.contactDamage = type.contactDamage;
     enemy.body.setCollideWorldBounds(true);
     return enemy;
   }
 
   createShooterEnemy(x, y, shooterType = null) {
-    // Types de shooters avec movesets uniques
+    // Types de shooters avec movesets uniques et dégâts de contact
+    // contactDamage: 1 = 1/4 coeur, 2 = 1/2 coeur, 3 = 3/4 coeur, 4 = 1 coeur
     const shooterTypes = [
       {
         w: 30, h: 30, color: 0xff8800, stroke: 0xcc6600,
         delay: 2800, piercing: false, name: 'sniper',
         // Sniper: reste immobile, tire précis, recule après le tir
-        mobile: false, behavior: 'sniper'
+        mobile: false, behavior: 'sniper', contactDamage: 4  // 1 coeur - s'approcher d'un sniper est dangereux
       },
       {
         w: 25, h: 40, color: 0xff4400, stroke: 0xcc2200,
         delay: 1800, piercing: false, name: 'gunner',
         // Gunner: mobile, tirs rapides en rafale, se déplace entre les tirs
-        mobile: true, behavior: 'gunner'
+        mobile: true, behavior: 'gunner', contactDamage: 3   // 3/4 coeur - mobile, moins dangereux au contact
       },
       {
         w: 40, h: 25, color: 0x8800ff, stroke: 0x6600cc,
         delay: 3500, piercing: true, name: 'mage',
         // Mage: flotte, téléporte, tire des projectiles perçants
-        mobile: true, behavior: 'mage'
+        mobile: true, behavior: 'mage', contactDamage: 2     // 1/2 coeur - fragile, flotte au-dessus
       },
     ];
 
@@ -2750,10 +3280,36 @@ class GameScene extends Phaser.Scene {
       (this.currentLevel >= 4 && Math.random() < 0.25 ? 2 : (Math.random() < 0.4 ? 1 : 0));
     const type = shooterTypes[Math.min(typeIndex, shooterTypes.length - 1)];
 
+    // === VÉRIFICATION DE HAUTEUR POUR GUNNER ===
+    // Le gunner est grand (40px), vérifier qu'il y a assez de place
+    if (type.behavior === 'gunner') {
+      let hasCeilingAbove = false;
+      const checkHeight = type.h + 20; // Hauteur du gunner + marge
+
+      this.platforms.getChildren().forEach(platform => {
+        if (!platform || !platform.active) return;
+        const platBottom = platform.y + platform.height / 2;
+        const platLeft = platform.x - platform.width / 2;
+        const platRight = platform.x + platform.width / 2;
+
+        // Y a-t-il une plateforme au-dessus dans la zone de spawn?
+        if (platBottom > y - checkHeight && platBottom < y &&
+            x >= platLeft - 10 && x <= platRight + 10) {
+          hasCeilingAbove = true;
+        }
+      });
+
+      // Si pas assez de place, créer un sniper à la place
+      if (hasCeilingAbove) {
+        return this.createShooterEnemy(x, y, 0); // Forcer sniper
+      }
+    }
+
     const shooter = this.add.rectangle(x, y, type.w, type.h, type.color);
     shooter.setStrokeStyle(2, type.stroke);
     shooter.shooterType = type;
     shooter.originalColor = type.color;
+    shooter.contactDamage = type.contactDamage;
     this.shooters.add(shooter);
 
     // Configuration physique selon le type
@@ -2773,6 +3329,38 @@ class GameScene extends Phaser.Scene {
     shooter.homeY = y;
     shooter.shotsFired = 0;
     shooter.canShoot = true;
+
+    // === PATROL BOUNDS POUR GUNNER (comme les ennemis normaux) ===
+    if (type.behavior === 'gunner') {
+      // Trouver la plateforme sous le shooter
+      let platformUnder = null;
+      this.platforms.getChildren().forEach(platform => {
+        if (!platform || !platform.active) return;
+        const platTop = platform.y - platform.height / 2;
+        const platLeft = platform.x - platform.width / 2;
+        const platRight = platform.x + platform.width / 2;
+
+        // Le shooter est-il sur cette plateforme?
+        if (Math.abs(y + type.h / 2 + 10 - platTop) < 20 &&
+            x >= platLeft - 5 && x <= platRight + 5) {
+          platformUnder = platform;
+        }
+      });
+
+      if (platformUnder) {
+        const halfWidth = platformUnder.width / 2;
+        shooter.patrolMin = platformUnder.x - halfWidth + 20; // Marge de sécurité
+        shooter.patrolMax = platformUnder.x + halfWidth - 20;
+      } else {
+        // Pas de plateforme trouvée, utiliser position actuelle
+        shooter.patrolMin = x - 30;
+        shooter.patrolMax = x + 30;
+      }
+
+      shooter.patrolDir = Math.random() > 0.5 ? 1 : -1;
+      shooter.patrolPauseTimer = 0;
+      shooter.isPatrolPaused = false;
+    }
 
     // Timer de tir individuel
     const baseDelay = type.delay - Math.min(this.currentLevel * 100, 800);
@@ -2848,8 +3436,38 @@ class GameScene extends Phaser.Scene {
       onComplete: () => {
         if (!shooter || !shooter.active) return;
 
-        // Nouvelle position (autour du joueur mais pas trop proche)
-        const angle = Math.random() * Math.PI * 2;
+        // === ÉVITER LA TRAJECTOIRE DU JOUEUR ===
+        // Calculer l'angle de mouvement du joueur
+        const playerVelX = this.player.body.velocity.x;
+        const playerVelY = this.player.body.velocity.y;
+        const playerSpeed = Math.sqrt(playerVelX * playerVelX + playerVelY * playerVelY);
+
+        // Angle vers lequel le joueur se dirige
+        let playerMoveAngle = 0;
+        if (playerSpeed > 30) {
+          playerMoveAngle = Math.atan2(playerVelY, playerVelX);
+        }
+
+        // Choisir un angle de téléportation qui évite la trajectoire du joueur
+        let angle;
+        let attempts = 0;
+        const maxAttempts = 10;
+
+        do {
+          angle = Math.random() * Math.PI * 2;
+          attempts++;
+
+          // Calculer la différence d'angle avec la trajectoire du joueur
+          let angleDiff = Math.abs(angle - playerMoveAngle);
+          if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+
+          // Si le joueur bouge vite, éviter de se téléporter dans sa trajectoire
+          // (angle différent d'au moins 60° de la direction du joueur)
+          if (playerSpeed < 30 || angleDiff > Math.PI / 3) {
+            break;
+          }
+        } while (attempts < maxAttempts);
+
         const dist = 150 + Math.random() * 100;
         let newX = this.player.x + Math.cos(angle) * dist;
         let newY = this.player.y + Math.sin(angle) * dist - 50;
@@ -2959,17 +3577,26 @@ class GameScene extends Phaser.Scene {
 
       let bullet;
       if (type.piercing) {
-        // Projectile perçant - losange avec bordure rouge
+        // Projectile perçant MAGE - losange avec bordure rouge
         bullet = this.add.polygon(shooter.x, shooter.y, [0, -10, 5, 0, 0, 10, -5, 0], 0x8800ff);
         bullet.setStrokeStyle(2, 0xff0000);
         bullet.piercing = true;
+        bullet.damage = 2; // 1/2 coeur - perçant mais lent
         bullet.setRotation(angle + Math.PI / 2);
+      } else if (type.behavior === 'gunner') {
+        // Projectile GUNNER - petit mais rapide
+        const bulletSize = quickFire ? 4 : 6;
+        bullet = this.add.circle(shooter.x, shooter.y, bulletSize, 0xff4400);
+        bullet.setStrokeStyle(2, 0xcc2200);
+        bullet.piercing = false;
+        bullet.damage = quickFire ? 1 : 2; // 1/4 ou 1/2 coeur selon rafale
       } else {
-        // Projectile normal - cercle
-        const bulletSize = quickFire ? 5 : 7;
+        // Projectile SNIPER - normal, précis
+        const bulletSize = 7;
         bullet = this.add.circle(shooter.x, shooter.y, bulletSize, 0xffee00);
         bullet.setStrokeStyle(2, 0xff6600);
         bullet.piercing = false;
+        bullet.damage = 2; // 1/2 coeur - précis mais évitable
       }
 
       this.bullets.add(bullet);
@@ -2998,29 +3625,62 @@ class GameScene extends Phaser.Scene {
 
       switch (type.behavior) {
         case 'gunner':
-          // Gunner: se déplace entre les rafales
+          // === GUNNER: Mouvement organique style patrol ===
+          const patrolMin = shooter.patrolMin || shooter.homeX - 30;
+          const patrolMax = shooter.patrolMax || shooter.homeX + 30;
+          const blockedLeft = shooter.x <= patrolMin || shooter.body.blocked.left;
+          const blockedRight = shooter.x >= patrolMax || shooter.body.blocked.right;
+          const moveSpeed = 50; // Vitesse de base (plus lent que les ennemis normaux)
+
+          // Mettre à jour le timer de pause
+          if (shooter.isPatrolPaused) {
+            shooter.patrolPauseTimer += delta;
+          }
+
           if (shooter.aiState === 'reposition') {
-            // Se déplacer perpendiculairement au joueur
-            const perpDir = shooter.repositionDir || (Math.random() > 0.5 ? 1 : -1);
-            shooter.repositionDir = perpDir;
+            // Mode repositionnement actif après une rafale
 
-            const moveSpeed = 80;
-            shooter.body.setVelocityX(perpDir * moveSpeed);
+            // Vérification des bords avec pause naturelle
+            if (blockedRight && shooter.patrolDir > 0) {
+              shooter.patrolDir = -1;
+              shooter.body.setVelocityX(0);
+              shooter.isPatrolPaused = true;
+              shooter.patrolPauseTimer = 0;
+            } else if (blockedLeft && shooter.patrolDir < 0) {
+              shooter.patrolDir = 1;
+              shooter.body.setVelocityX(0);
+              shooter.isPatrolPaused = true;
+              shooter.patrolPauseTimer = 0;
+            }
 
-            // Après un moment, s'arrêter
-            if (shooter.aiTimer > 800) {
+            // Si en pause, attendre avant de repartir
+            if (shooter.isPatrolPaused) {
+              if (shooter.patrolPauseTimer > 300) { // Pause de 300ms aux bords
+                shooter.isPatrolPaused = false;
+              }
+            } else {
+              // Mouvement fluide avec interpolation (comme les ennemis normaux)
+              const targetVel = shooter.patrolDir * moveSpeed;
+              const currentVel = shooter.body.velocity.x;
+              shooter.body.setVelocityX(currentVel + (targetVel - currentVel) * 0.08);
+            }
+
+            // Après un moment, s'arrêter et passer en idle
+            if (shooter.aiTimer > 1200) {
               shooter.body.setVelocityX(0);
               shooter.aiState = 'idle';
-              shooter.repositionDir = -shooter.repositionDir; // Alterner
+              shooter.aiTimer = 0;
             }
+          } else if (shooter.aiState === 'idle' || shooter.aiState === 'burst') {
+            // En idle ou pendant le tir: ralentir doucement
+            const currentVel = shooter.body.velocity.x;
+            shooter.body.setVelocityX(currentVel * 0.92);
 
-            // Rester dans les limites
-            if (shooter.x < 80 || shooter.x > this.WORLD.width - 80) {
-              shooter.repositionDir = -shooter.repositionDir;
+            // Petit mouvement de "vie" en idle (oscillation subtile)
+            if (shooter.aiState === 'idle' && Math.abs(currentVel) < 5) {
+              const idleWiggle = Math.sin(this.time.now / 800 + shooter.homeX) * 0.3;
+              shooter.body.setVelocityX(idleWiggle * 10);
             }
-          } else {
-            // Friction au sol
-            shooter.body.setVelocityX(shooter.body.velocity.x * 0.9);
           }
           break;
 
@@ -3590,11 +4250,11 @@ class GameScene extends Phaser.Scene {
       });
     });
 
-    // Spikes
+    // Spikes - dégâts mineurs (1/2 coeur)
     if (this.spikes.getChildren().length > 0) {
       this.physics.add.overlap(this.player, this.spikes, () => {
         if (!this.isInvincible) {
-          this.takeDamage();
+          this.takeDamage(2); // 1/2 coeur - hazard mineur
           this.player.body.setVelocityY(-300);
           this.screenShake(0.02, 100);
         }
@@ -4063,13 +4723,13 @@ class GameScene extends Phaser.Scene {
     // === PROPRIÉTÉS PHYSIQUES RÉALISTES ===
     // Chaque boss a des caractéristiques de mouvement uniques
     const physicsProfiles = {
-      1: { // CHARGER - Lourd, avec momentum
+      1: { // CHARGER - Lourd, ancré au sol comme un taureau
         mass: 1.5,
         acceleration: 400,
         maxSpeed: 200,
         drag: 0.92,
-        floatAmplitude: 3,
-        floatSpeed: 0.002,
+        floatAmplitude: 0, // PAS de flottement - il est ANCRÉ
+        floatSpeed: 0,
         lungeForce: 600,
         weight: 'heavy'
       },
@@ -5244,82 +5904,231 @@ class GameScene extends Phaser.Scene {
   // BOSS 1 : CHARGER - Dash + Tirs en éventail
   // ==========================================
   initBossCharger() {
-    // === DARK SOULS STYLE: CHARGER ===
-    // - Clear wind-up before charges
-    // - Recovery window after attacks
-    // - Predictable patterns that can be learned
+    // === CHARGER: LE TAUREAU LÉGENDAIRE ===
+    // Premier boss - doit être MÉMORABLE et IMPRESSIONNANT
+    // - Cercle autour du joueur comme un prédateur
+    // - Charges dévastatrices avec wind-up clair
+    // - Tirs en éventail puissants
+    // - Recovery windows pour punir
 
-    this.chargerState = 'idle'; // idle, winding, charging, recovering, shooting
+    this.chargerState = 'idle'; // idle, circling, winding, charging, recovering, shooting, evading
     this.chargerComboCount = 0;
+    this.chargerOrbitAngle = Math.random() * Math.PI * 2; // Angle d'orbite initial
+    this.chargerOrbitDir = Math.random() < 0.5 ? 1 : -1; // Direction d'orbite
+    this.chargerOrbitRadius = 200; // Distance du joueur
 
-    // Vitesse initiale lente (Dark Souls: bosses start slow)
-    this.setBossTargetVelocity(this.boss.moveSpeed * 0.3, 0);
+    // Commence à cercler
+    this.setBossTargetVelocity(0, 0);
 
-    // Mouvement lent et menaçant
+    // Timer d'état idle (vérification périodique pour animations)
     this.bossMoveTimer = this.time.addEvent({
-      delay: 2500,
+      delay: 400, // Check fréquent pour animations idle
       callback: this.bossChargerMove,
       callbackScope: this,
       loop: true
     });
 
-    // Attaques avec plus de délai (apprentissage)
+    // Tir en éventail - AGRESSIF
     this.bossShootTimer = this.time.addEvent({
-      delay: 3000, // Plus lent pour permettre l'apprentissage
+      delay: 1800, // Tirs fréquents!
       callback: this.bossChargerShoot,
       callbackScope: this,
       loop: true
     });
 
-    // Timer de charge (nouvelle attaque signature)
+    // Charge DÉVASTATRICE - attaque signature FRÉQUENTE
     this.chargerChargeTimer = this.time.addEvent({
-      delay: 5000,
+      delay: 2800, // Charges très fréquentes!
       callback: this.bossChargerWindUp,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Rugissement périodique (intimidation)
+    this.chargerRoarTimer = this.time.addEvent({
+      delay: 5000,
+      callback: this.bossChargerRoar,
       callbackScope: this,
       loop: true
     });
   }
 
+  bossChargerRoar() {
+    if (!this.boss || !this.boss.active) return;
+    if (this.chargerState !== 'idle') return;
+
+    // Animation de rugissement
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.15,
+      scaleY: 0.9,
+      duration: 200,
+      yoyo: true,
+      repeat: 2
+    });
+
+    // SFX de rugissement intimidant
+    this.playSound('bossRoar');
+
+    // Particules de rage
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      this.emitParticles(this.boss.x + Math.cos(angle) * 40, this.boss.y + Math.sin(angle) * 40, {
+        count: 2,
+        colors: [0xff4400, 0xff0000, 0xff6600],
+        minSpeed: 30,
+        maxSpeed: 60,
+        minSize: 3,
+        maxSize: 7,
+        life: 400,
+        angle: angle,
+        spread: 0.5,
+        fadeOut: true
+      });
+    }
+
+    // Screen shake léger
+    this.cameras.main.shake(200, 0.005);
+  }
+
   bossChargerMove() {
     if (!this.boss || !this.boss.active) return;
-    if (this.chargerState !== 'idle') return; // Ne bouge pas pendant les attaques
+    if (this.chargerState !== 'idle') return;
+
+    // === CHARGER: LE TAUREAU - Cercle autour du joueur comme un prédateur ===
 
     const toPlayerX = this.player.x - this.boss.x;
     const toPlayerY = this.player.y - this.boss.y;
-    const playerAbove = this.player.y < this.boss.y - 20;
-    const playerAligned = Math.abs(toPlayerX) < 80;
+    const distToPlayer = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
 
-    // Esquive si joueur au-dessus (réaction défensive)
-    if (playerAbove && playerAligned && !this.bossDashCooldown) {
+    // === COMPORTEMENT DE CERCLE AUTOUR DU JOUEUR ===
+    // Le boss orbite autour du joueur, maintenant la pression
+
+    // Mettre à jour l'angle d'orbite
+    const orbitSpeed = 0.015 + this.bossPhase * 0.005; // Plus rapide selon la phase
+    this.chargerOrbitAngle += orbitSpeed * this.chargerOrbitDir;
+
+    // Changer parfois de direction pour être imprévisible
+    if (Math.random() < 0.005) {
+      this.chargerOrbitDir *= -1;
+    }
+
+    // Position cible sur l'orbite (autour du joueur)
+    const targetRadius = this.chargerOrbitRadius - this.bossPhase * 20; // Plus proche selon phase
+    const targetX = this.player.x + Math.cos(this.chargerOrbitAngle) * targetRadius;
+    const targetY = this.player.y + Math.sin(this.chargerOrbitAngle) * Math.min(targetRadius * 0.4, 80); // Orbite aplatie (plus horizontal)
+
+    // Limiter dans l'arène
+    const clampedX = Phaser.Math.Clamp(targetX, 100, this.WORLD.width - 100);
+    const clampedY = Phaser.Math.Clamp(targetY, 150, this.WORLD.groundY - 80);
+
+    // Mouvement vers la position cible
+    const moveToX = clampedX - this.boss.x;
+    const moveToY = clampedY - this.boss.y;
+    const moveDist = Math.sqrt(moveToX * moveToX + moveToY * moveToY) || 1;
+
+    // Vitesse de mouvement (modérée, menaçante)
+    const moveSpeed = 80 + this.bossPhase * 20;
+    if (moveDist > 10) {
+      this.setBossTargetVelocity(
+        (moveToX / moveDist) * moveSpeed,
+        (moveToY / moveDist) * moveSpeed * 0.6 // Moins vertical
+      );
+    } else {
+      this.setBossTargetVelocity(0, 0);
+    }
+
+    // Animation de respiration/pulsation menaçante pendant le mouvement
+    if (!this.chargerBreathingTween || !this.chargerBreathingTween.isPlaying()) {
+      this.chargerBreathingTween = this.tweens.add({
+        targets: this.boss,
+        scaleX: { from: 1, to: 1.05 },
+        scaleY: { from: 1, to: 0.97 },
+        duration: 600,
+        yoyo: true,
+        repeat: 0,
+        ease: 'Sine.easeInOut'
+      });
+    }
+
+    // Particules de fumée des naseaux pendant le mouvement
+    if (Math.random() < 0.08) {
+      const facing = Math.sign(this.player.x - this.boss.x) || 1;
+      const noseX = this.boss.x + facing * 25;
+      this.emitParticles(noseX, this.boss.y + 5, {
+        count: 2,
+        colors: [0x333333, 0x555555, 0xff4400],
+        minSpeed: 15,
+        maxSpeed: 35,
+        minSize: 3,
+        maxSize: 6,
+        life: 350,
+        angle: facing > 0 ? 0 : Math.PI,
+        spread: 0.5,
+        fadeOut: true
+      });
+    }
+
+    // === ESQUIVE DÉFENSIVE: Si joueur au-dessus et proche ===
+    const playerAbove = this.player.y < this.boss.y - 20;
+    const playerDescending = this.player.body.velocity.y > 50;
+    const playerClose = distToPlayer < 180; // Détection plus large
+
+    if (playerAbove && playerClose && playerDescending && !this.bossDashCooldown) {
       const escapeDir = toPlayerX !== 0 ? -Math.sign(toPlayerX) : (Math.random() < 0.5 ? -1 : 1);
 
-      // Animation d'esquive (tell visuel)
+      this.chargerState = 'evading';
+
+      // Inverser direction d'orbite après esquive
+      this.chargerOrbitDir *= -1;
+
+      // Grognement d'agacement
+      this.playSound('bossHurtCry');
+
+      // Animation d'esquive rapide
       this.tweens.add({
         targets: this.boss,
-        scaleX: 0.8,
-        duration: 150,
+        scaleX: 0.7,
+        scaleY: 1.2,
+        duration: 100,
         yoyo: true
       });
 
-      this.bossLunge(escapeDir, -0.3, 400);
+      // Esquive rapide
+      this.bossLunge(escapeDir, -0.3, 450);
       this.bossDashCooldown = true;
-      this.time.delayedCall(2000, () => this.bossDashCooldown = false);
-      return;
+
+      // === CONTRE-ATTAQUE SURPRISE après esquive ===
+      this.time.delayedCall(400, () => {
+        if (!this.boss || !this.boss.active) return;
+
+        // Tir rapide de représailles (surprise!)
+        this.playSound('bossWarning');
+        const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
+        for (let i = -1; i <= 1; i++) {
+          this.createBossBullet(this.boss.x, this.boss.y, angle + i * 0.3, 200);
+        }
+
+        // Particules de rage
+        this.emitParticles(this.boss.x, this.boss.y, {
+          count: 8,
+          colors: [0xff4400, 0xff0000],
+          minSpeed: 60,
+          maxSpeed: 120,
+          minSize: 4,
+          maxSize: 8,
+          life: 300,
+          spread: Math.PI * 2,
+          fadeOut: true
+        });
+      });
+
+      // Retour à idle après esquive + contre-attaque
+      this.time.delayedCall(600, () => {
+        this.chargerState = 'idle';
+      });
+      this.time.delayedCall(1500, () => this.bossDashCooldown = false);
     }
-
-    // Mouvement de traque lent (Dark Souls style)
-    const speed = this.boss.moveSpeed * 0.4; // Plus lent
-    const targetX = (toPlayerX > 0 ? 1 : -1) * speed;
-    const targetY = (Math.random() - 0.5) * speed * 0.3;
-
-    // Rester dans les limites
-    const maxY = this.WORLD.groundY - 200;
-    const minY = 150;
-    let finalTargetY = targetY;
-    if (this.boss.y > maxY) finalTargetY = -speed * 0.5;
-    if (this.boss.y < minY) finalTargetY = speed * 0.5;
-
-    this.setBossTargetVelocity(targetX, finalTargetY);
   }
 
   bossChargerWindUp() {
@@ -5328,6 +6137,10 @@ class GameScene extends Phaser.Scene {
 
     this.chargerState = 'winding';
     this.setBossTargetVelocity(0, 0); // Arrêt complet
+
+    // SFX de préparation de charge
+    this.playSound('bossCharge');
+    this.playSound('bossWarning');
 
     const toPlayerX = this.player.x - this.boss.x;
     const toPlayerY = this.player.y - this.boss.y;
@@ -5374,36 +6187,140 @@ class GameScene extends Phaser.Scene {
 
     this.chargerState = 'charging';
 
-    // === CHARGE! ===
-    const chargeForce = 600 + (this.bossPhase - 1) * 100;
-    this.bossLunge(dirX, dirY * 0.3, chargeForce);
+    // === SFX DE CHARGE DÉVASTATRICE ===
+    this.playSound('bossDash');
 
-    // Traînée de particules pendant la charge
-    for (let i = 0; i < 8; i++) {
-      this.time.delayedCall(i * 60, () => {
-        if (this.boss && this.boss.active) {
+    // === CHARGE TRAVERSE TOUT! ===
+    // Désactiver les collisions avec les murs pendant la charge
+    this.boss.body.setCollideWorldBounds(false);
+
+    // === CHARGE! - Plus puissante et impressionnante ===
+    const chargeForce = 750 + (this.bossPhase - 1) * 150;
+    this.bossLunge(dirX, dirY * 0.2, chargeForce);
+
+    // Screen shake pendant la charge
+    this.cameras.main.shake(400, 0.02);
+
+    // Animation d'étirement pendant la charge
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.4,
+      scaleY: 0.7,
+      duration: 150,
+      yoyo: true,
+      repeat: 2
+    });
+
+    // Traînée de particules INTENSE pendant la charge
+    for (let i = 0; i < 12; i++) {
+      this.time.delayedCall(i * 40, () => {
+        if (this.boss && this.boss.active && this.chargerState === 'charging') {
+          // Particules de feu/rage
           this.emitParticles(this.boss.x, this.boss.y, {
-            count: 4,
-            colors: [0xff4400, 0xff6600, 0xffaa00],
-            minSpeed: 20,
-            maxSpeed: 60,
-            minSize: 4,
-            maxSize: 10,
-            life: 250,
-            spread: Math.PI,
+            count: 6,
+            colors: [0xff4400, 0xff0000, 0xffaa00, 0xffff00],
+            minSpeed: 40,
+            maxSpeed: 100,
+            minSize: 5,
+            maxSize: 14,
+            life: 300,
+            spread: Math.PI * 0.8,
             angle: Math.atan2(-dirY, -dirX),
-            fadeOut: true
+            fadeOut: true,
+            shape: 'star'
           });
+
+          // Traînée de poussière au sol
+          if (this.boss.y > this.WORLD.groundY - 100) {
+            this.emitParticles(this.boss.x, this.WORLD.groundY - 20, {
+              count: 3,
+              colors: [0x886644, 0xaa8866, 0x664422],
+              minSpeed: 30,
+              maxSpeed: 70,
+              minSize: 4,
+              maxSize: 10,
+              life: 400,
+              angle: -Math.PI / 2,
+              spread: Math.PI / 2,
+              fadeOut: true
+            });
+          }
         }
       });
     }
 
+    // === IMPACT AU MUR (si applicable) ===
+    this.time.delayedCall(500, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      // Vérifier si proche d'un mur
+      if (this.boss.x < 120 || this.boss.x > this.WORLD.width - 120) {
+        // IMPACT AU MUR - effet dévastateur
+        this.playSound('bossHit');
+        this.cameras.main.shake(300, 0.025);
+
+        // Explosion de particules à l'impact
+        this.emitParticles(this.boss.x, this.boss.y, {
+          count: 20,
+          colors: [0xff4400, 0xffaa00, 0xffffff],
+          minSpeed: 100,
+          maxSpeed: 250,
+          minSize: 4,
+          maxSize: 12,
+          life: 400,
+          spread: Math.PI * 2,
+          fadeOut: true
+        });
+      }
+    });
+
     // === RECOVERY WINDOW (OPENING) ===
-    this.time.delayedCall(600, () => {
+    this.time.delayedCall(650, () => {
       if (!this.boss || !this.boss.active) return;
 
       this.chargerState = 'recovering';
       this.setBossTargetVelocity(0, 0);
+      this.boss.body.setVelocity(0, 0);
+
+      // Réactiver les collisions avec les bords
+      this.boss.body.setCollideWorldBounds(true);
+
+      // Si le boss est sorti de l'arène, le téléporter de l'autre côté (effet wrap-around)
+      if (this.boss.x < 50) {
+        // Sorti à gauche -> réapparaît à droite
+        this.boss.x = this.WORLD.width - 100;
+        this.emitParticles(this.boss.x, this.boss.y, {
+          count: 15,
+          colors: [0xff4400, 0xff0000, 0xffaa00],
+          minSpeed: 80,
+          maxSpeed: 180,
+          minSize: 5,
+          maxSize: 12,
+          life: 400,
+          spread: Math.PI * 2,
+          fadeOut: true
+        });
+      } else if (this.boss.x > this.WORLD.width - 50) {
+        // Sorti à droite -> réapparaît à gauche
+        this.boss.x = 100;
+        this.emitParticles(this.boss.x, this.boss.y, {
+          count: 15,
+          colors: [0xff4400, 0xff0000, 0xffaa00],
+          minSpeed: 80,
+          maxSpeed: 180,
+          minSize: 5,
+          maxSize: 12,
+          life: 400,
+          spread: Math.PI * 2,
+          fadeOut: true
+        });
+      }
+
+      // Garder le boss dans les limites Y
+      this.boss.y = Phaser.Math.Clamp(this.boss.y, 100, this.WORLD.groundY - 80);
+
+      // SFX de récupération (essoufflement)
+      this.playSound('bossHurtCry');
 
       // Animation de récupération (boss vulnérable)
       this.tweens.add({
@@ -5415,22 +6332,22 @@ class GameScene extends Phaser.Scene {
         repeat: 1
       });
 
-      // Particules de fatigue
+      // Particules de fatigue/vapeur
       this.emitParticles(this.boss.x, this.boss.y - 20, {
-        count: 5,
-        colors: [0xffff00, 0xffffff],
-        minSpeed: 10,
-        maxSpeed: 30,
-        minSize: 2,
-        maxSize: 4,
-        life: 500,
+        count: 8,
+        colors: [0xffff00, 0xffffff, 0xaaaaaa],
+        minSpeed: 15,
+        maxSpeed: 40,
+        minSize: 3,
+        maxSize: 6,
+        life: 600,
         angle: -Math.PI / 2,
-        spread: Math.PI / 3,
+        spread: Math.PI / 2,
         fadeOut: true
       });
 
-      // Retour à idle après recovery
-      this.time.delayedCall(1200, () => {
+      // Retour à idle après recovery (plus court!)
+      this.time.delayedCall(800, () => {
         if (this.boss && this.boss.active) {
           this.chargerState = 'idle';
           this.tweens.add({
@@ -5446,60 +6363,107 @@ class GameScene extends Phaser.Scene {
 
   bossChargerShoot() {
     if (!this.boss || !this.boss.active || this.bossShotPaused) return;
-    if (this.chargerState !== 'idle') return; // Ne tire pas pendant les autres états
+    if (this.chargerState !== 'idle') return;
 
     this.chargerState = 'shooting';
 
-    // === TELEGRAPH (TELL VISUEL) ===
-    // Animation de charge du tir
+    // SFX d'avertissement de tir
+    this.playSound('bossWarning');
+
+    // Choisir un pattern d'attaque aléatoire (variété!)
+    const attackPattern = Math.floor(Math.random() * 3);
+
+    // === TELEGRAPH VISUEL ===
     this.tweens.add({
       targets: this.boss,
-      scaleX: 1.2,
-      scaleY: 1.2,
-      duration: 500, // Long telegraph
+      scaleX: 1.25,
+      scaleY: 1.25,
+      duration: 400,
       ease: 'Quad.easeIn',
       onUpdate: () => {
-        // Particules de charge
-        if (Math.random() < 0.4) {
+        if (Math.random() < 0.5) {
           const angle = Math.random() * Math.PI * 2;
-          const dist = 40;
+          const dist = 45;
           this.emitParticles(this.boss.x + Math.cos(angle) * dist, this.boss.y + Math.sin(angle) * dist, {
-            count: 1,
-            colors: [0xff00ff, 0xaa00aa],
-            minSpeed: 40,
-            maxSpeed: 80,
-            minSize: 2,
-            maxSize: 4,
-            life: 200,
+            count: 2,
+            colors: [0xff00ff, 0xaa00aa, 0xff4400],
+            minSpeed: 50,
+            maxSpeed: 100,
+            minSize: 3,
+            maxSize: 6,
+            life: 250,
             angle: angle + Math.PI,
-            spread: 0.3,
+            spread: 0.4,
             fadeOut: true
           });
         }
       }
     });
 
-    this.time.delayedCall(550, () => {
+    // Flash d'avertissement
+    this.cameras.main.flash(100, 255, 100, 100, false);
+
+    this.time.delayedCall(450, () => {
       if (!this.boss || !this.boss.active || this.bossShotPaused) return;
 
-      // === TIR ===
-      const numBullets = 2 + this.bossPhase; // Moins de balles, plus espacées
-      const spreadAngle = Math.PI / 5;
       const baseAngle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
 
-      for (let i = 0; i < numBullets; i++) {
-        const angle = baseAngle - spreadAngle / 2 + (spreadAngle / (numBullets - 1)) * i;
-        this.createBossBullet(this.boss.x, this.boss.y, angle, 150); // Plus lent
+      if (attackPattern === 0) {
+        // === PATTERN 1: ÉVENTAIL LARGE ===
+        const numBullets = 5 + this.bossPhase * 2;
+        const spreadAngle = Math.PI * 0.6; // 108 degrés
+
+        for (let i = 0; i < numBullets; i++) {
+          const angle = baseAngle - spreadAngle / 2 + (spreadAngle / (numBullets - 1)) * i;
+          this.createBossBullet(this.boss.x, this.boss.y, angle, 180);
+        }
+      } else if (attackPattern === 1) {
+        // === PATTERN 2: TRIPLE VAGUE ===
+        for (let wave = 0; wave < 3; wave++) {
+          this.time.delayedCall(wave * 150, () => {
+            if (!this.boss || !this.boss.active) return;
+            const numBullets = 3 + this.bossPhase;
+            const spreadAngle = Math.PI * 0.3;
+            const waveOffset = (wave - 1) * 0.15; // Décalage entre vagues
+
+            for (let i = 0; i < numBullets; i++) {
+              const angle = baseAngle + waveOffset - spreadAngle / 2 + (spreadAngle / (numBullets - 1)) * i;
+              this.createBossBullet(this.boss.x, this.boss.y, angle, 160 + wave * 30);
+            }
+          });
+        }
+      } else {
+        // === PATTERN 3: CERCLE EXPLOSIF ===
+        const numBullets = 8 + this.bossPhase * 2;
+        for (let i = 0; i < numBullets; i++) {
+          const angle = (i / numBullets) * Math.PI * 2;
+          this.createBossBullet(this.boss.x, this.boss.y, angle, 140);
+        }
+        // Deuxième cercle décalé
+        this.time.delayedCall(200, () => {
+          if (!this.boss || !this.boss.active) return;
+          for (let i = 0; i < numBullets; i++) {
+            const angle = (i / numBullets) * Math.PI * 2 + Math.PI / numBullets;
+            this.createBossBullet(this.boss.x, this.boss.y, angle, 120);
+          }
+        });
       }
 
-      // Animation de recul
+      // SFX de tir puissant
+      this.playSound('bossBullet');
+
+      // Animation de recul puissant
       this.tweens.add({
         targets: this.boss,
-        scaleX: 0.9,
-        scaleY: 0.9,
-        duration: 150,
-        yoyo: true
+        scaleX: 0.85,
+        scaleY: 0.85,
+        duration: 100,
+        yoyo: true,
+        repeat: 1
       });
+
+      // Screen shake
+      this.cameras.main.shake(150, 0.008);
 
       // Recovery après tir
       this.time.delayedCall(400, () => {
@@ -5522,9 +6486,16 @@ class GameScene extends Phaser.Scene {
     this.spinnerAngle = 0;
     this.spinnerState = 'spinning'; // spinning, charging, bursting, dizzy
     this.spinnerBurstCount = 0;
+    this.spinnerOrbitAngle = Math.random() * Math.PI * 2;
+    this.spinnerOrbitDir = Math.random() < 0.5 ? 1 : -1;
 
-    // Mouvement léger en dérive
-    this.setBossTargetVelocity(30, 20);
+    // Mouvement orbital continu autour du joueur
+    this.spinnerDriftTimer = this.time.addEvent({
+      delay: 100,
+      callback: this.bossSpinnerDrift,
+      callbackScope: this,
+      loop: true
+    });
 
     // Téléportation avec telegraph
     this.bossMoveTimer = this.time.addEvent({
@@ -5549,6 +6520,58 @@ class GameScene extends Phaser.Scene {
       callbackScope: this,
       loop: true
     });
+  }
+
+  bossSpinnerDrift() {
+    if (!this.boss || !this.boss.active) return;
+    if (this.spinnerState !== 'spinning') return;
+
+    // === SPINNER: LA TOURELLE - Reste en place, tourne et tire ===
+    // Ne bouge PAS - la rotation EST le mouvement
+    // Téléportation gérée séparément
+
+    // Immobile
+    this.setBossTargetVelocity(0, 0);
+
+    // Légère lévitation sur place (flottement subtil)
+    if (!this.spinnerFloatTween || !this.spinnerFloatTween.isPlaying()) {
+      const baseY = this.boss.y;
+      this.spinnerFloatTween = this.tweens.add({
+        targets: this.boss,
+        y: baseY - 8,
+        duration: 1500,
+        yoyo: true,
+        repeat: 0,
+        ease: 'Sine.easeInOut'
+      });
+    }
+
+    // Rotation continue (l'essence du SPINNER)
+    if (this.bossVisuals) {
+      this.bossVisuals.rotation += 0.03 + (this.bossPhase - 1) * 0.01;
+    }
+
+    // Particules d'énergie tournoyante
+    if (Math.random() < 0.05) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 25;
+      this.emitParticles(
+        this.boss.x + Math.cos(angle) * dist,
+        this.boss.y + Math.sin(angle) * dist,
+        {
+          count: 1,
+          colors: [0x00ffff, 0x00cccc, 0x66ffff],
+          minSpeed: 20,
+          maxSpeed: 40,
+          minSize: 2,
+          maxSize: 5,
+          life: 300,
+          angle: angle + Math.PI / 2,
+          spread: 0.3,
+          fadeOut: true
+        }
+      );
+    }
   }
 
   bossSpinnerTeleport() {
@@ -5604,16 +6627,22 @@ class GameScene extends Phaser.Scene {
         fadeOut: true
       });
 
-      // Nouvelle position
-      let newX, newY;
-      const minX = 200;
-      const maxX = this.WORLD.width - 200;
+      // === PLAYER-CENTERED TELEPORT ===
+      // Téléporte autour du joueur à une distance stratégique
+      const teleportDist = 180 + Math.random() * 80; // Distance du joueur
+      const teleportAngle = Math.random() * Math.PI * 2; // Angle aléatoire autour du joueur
+
+      let newX = this.player.x + Math.cos(teleportAngle) * teleportDist;
+      let newY = this.player.y + Math.sin(teleportAngle) * teleportDist;
+
+      // Clamper dans les limites de l'arène
+      const minX = 100;
+      const maxX = this.WORLD.width - 100;
       const minY = 100;
       const maxY = this.WORLD.groundY - 100;
-      do {
-        newX = Phaser.Math.Between(minX, maxX);
-        newY = Phaser.Math.Between(minY, maxY);
-      } while (Math.abs(newX - this.player.x) < 150 && Math.abs(newY - this.player.y) < 150);
+
+      newX = Math.max(minX, Math.min(maxX, newX));
+      newY = Math.max(minY, Math.min(maxY, newY));
 
       this.boss.x = newX;
       this.boss.y = newY;
@@ -5836,26 +6865,53 @@ class GameScene extends Phaser.Scene {
     if (!this.boss || !this.boss.active) return;
     if (this.splitterState !== 'idle') return;
 
+    // === SPLITTER: LE BLOB - Reste en place, palpite, puis BONDIT ===
+    // Ne bouge PAS sauf pour:
+    // 1. Attaques de rebond vers le joueur
+    // 2. Split (création de minions)
+
     const toPlayerX = this.player.x - this.boss.x;
     const toPlayerY = this.player.y - this.boss.y;
-    const speed = this.boss.moveSpeed * 0.5; // Plus lent
+    const distToPlayer = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
 
-    const minX = 150;
-    const maxX = this.WORLD.width - 150;
-    const minY = 100;
-    const maxY = this.WORLD.groundY - 100;
+    // === IDLE: Reste immobile, pulsation gluante ===
+    this.setBossTargetVelocity(0, 0);
 
-    let targetX = (toPlayerX > 0 ? 1 : -1) * speed * 0.5;
-    let targetY = (Math.random() - 0.5) * speed * 0.4;
+    // Animation de pulsation blob (comme de la gelée)
+    if (!this.splitterPulseTween || !this.splitterPulseTween.isPlaying()) {
+      this.splitterPulseTween = this.tweens.add({
+        targets: this.boss,
+        scaleX: { from: 1, to: 1.1 },
+        scaleY: { from: 1, to: 0.92 },
+        duration: 600,
+        yoyo: true,
+        repeat: 0,
+        ease: 'Sine.easeInOut'
+      });
+    }
 
-    // Ajustements pour les limites
-    if (this.boss.x < minX + 50) targetX = speed;
-    else if (this.boss.x > maxX - 50) targetX = -speed;
-    if (this.boss.y > maxY - 50) targetY = -speed * 0.5;
-    if (this.boss.y < minY + 50) targetY = speed * 0.5;
+    // Particules de goo qui dégouline
+    if (Math.random() < 0.04) {
+      const offsetX = (Math.random() - 0.5) * 40;
+      this.emitParticles(this.boss.x + offsetX, this.boss.y + 20, {
+        count: 1,
+        colors: [0xaaaa00, 0x888800, 0xcccc00],
+        minSpeed: 5,
+        maxSpeed: 15,
+        minSize: 3,
+        maxSize: 7,
+        life: 600,
+        angle: Math.PI / 2,
+        spread: 0.3,
+        fadeOut: true
+      });
+    }
 
-    // === BOUNCE avec WIND-UP ===
-    if (Math.random() < 0.12 && this.splitterBounceCount < 2) {
+    // === ATTAQUE BOUNCE: Bondit vers le joueur périodiquement ===
+    // Chance de bondir augmente si le joueur est proche
+    const bounceChance = distToPlayer < 200 ? 0.08 : 0.03;
+
+    if (Math.random() < bounceChance && this.splitterBounceCount < 2) {
       this.splitterState = 'charging';
       this.splitterBounceCount++;
 
@@ -5889,7 +6945,7 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.setBossTargetVelocity(targetX, targetY);
+    // Si pas de bounce, reste immobile (déjà géré au début)
   }
 
   bossSplitterWindUp() {
@@ -6083,7 +7139,7 @@ class GameScene extends Phaser.Scene {
         this.scoreText.setText(this.score.toString().padStart(6, '0'));
       }
     } else {
-      this.takeDamage();
+      this.takeDamage(2); // Minions Splitter = 1/2 coeur (petits)
     }
   }
 
@@ -6141,16 +7197,74 @@ class GameScene extends Phaser.Scene {
     if (!this.boss || !this.boss.active) return;
     if (this.guardianState !== 'guarding' && this.guardianState !== 'vulnerable') return;
 
+    // === GUARDIAN: LE MUR - Avance LENTEMENT et IMPLACABLEMENT ===
+    // Mouvement TRÈS lent mais constant vers le joueur
+    // Comme un mur qui se rapproche inexorablement
+
     const toPlayerX = this.player.x - this.boss.x;
     const toPlayerY = this.player.y - this.boss.y;
-    const dist = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
-    const speed = this.boss.moveSpeed * 0.3; // Très lent
+    const distToPlayer = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
 
-    // Mouvement massif et implacable
-    const targetX = (toPlayerX / dist) * speed;
-    const targetY = (toPlayerY / dist) * speed * 0.3;
+    // Direction vers le joueur (horizontale seulement, le Guardian reste au sol)
+    const dirX = toPlayerX / distToPlayer;
 
-    this.setBossTargetVelocity(targetX, targetY);
+    // === MARCHE IMPLACABLE ===
+    // Vitesse TRÈS lente - comme un tank ou un mur
+    const speed = this.boss.moveSpeed * 0.15; // Très lent
+
+    // Seulement horizontal - le Guardian est ancré
+    const velX = dirX * speed;
+
+    // Animation de pas lourds
+    if (!this.guardianStepTween || !this.guardianStepTween.isPlaying()) {
+      this.guardianStepTween = this.tweens.add({
+        targets: this.boss,
+        y: this.boss.y - 3,
+        scaleY: { from: 1, to: 0.97 },
+        duration: 400,
+        yoyo: true,
+        repeat: 0,
+        ease: 'Quad.easeInOut',
+        onYoyo: () => {
+          // Son de pas lourd
+          if (Math.random() < 0.5) {
+            this.playSound('land');
+          }
+          // Particules de poussière
+          this.emitParticles(this.boss.x, this.boss.y + 25, {
+            count: 3,
+            colors: [0x666666, 0x888888, 0x444444],
+            minSpeed: 10,
+            maxSpeed: 30,
+            minSize: 3,
+            maxSize: 6,
+            life: 400,
+            angle: -Math.PI / 2,
+            spread: Math.PI / 2,
+            fadeOut: true
+          });
+        }
+      });
+    }
+
+    // Le bouclier scintille périodiquement
+    if (Math.random() < 0.02 && this.guardianState === 'guarding') {
+      if (this.guardianShieldSprite) {
+        this.tweens.add({
+          targets: this.guardianShieldSprite,
+          alpha: { from: 0.8, to: 1 },
+          duration: 100,
+          yoyo: true
+        });
+      }
+    }
+
+    // S'arrête si très proche du joueur (prépare un slam)
+    if (distToPlayer < 80) {
+      this.setBossTargetVelocity(0, 0);
+    } else {
+      this.setBossTargetVelocity(velX, 0);
+    }
   }
 
   bossGuardianSlamWindUp() {
@@ -6358,6 +7472,10 @@ class GameScene extends Phaser.Scene {
     if (!this.boss || !this.boss.active || this.bossShotPaused) return;
     if (this.guardianState !== 'guarding' && this.guardianState !== 'vulnerable') return;
 
+    // SFX d'avertissement
+    this.playSound('bossWarning');
+    this.playSound('bossCharge');
+
     // === LONG TELEGRAPH for laser ===
     const targetY = this.player.y;
 
@@ -6413,7 +7531,7 @@ class GameScene extends Phaser.Scene {
         this.physics.add.existing(laser);
         laser.body.setAllowGravity(false);
         this.physics.add.overlap(this.player, laser, () => {
-          if (!this.isInvincible) this.takeDamage();
+          if (!this.isInvincible) this.takeDamage(6); // Laser de boss = 1.5 coeurs
         });
 
         // Particules le long du laser
@@ -6483,23 +7601,136 @@ class GameScene extends Phaser.Scene {
     if (!this.boss || !this.boss.active) return;
     if (this.summonerState !== 'drifting') return;
 
-    // Mouvement éthéré mystique - dérive fluide (plus prévisible)
-    const time = this.time.now;
-    const speed = this.boss.moveSpeed * 0.3;
+    // === SUMMONER: LE MAGE - Flotte immobile, channel son pouvoir ===
+    // Ne bouge PAS sauf pour:
+    // 1. Repositionnement occasionnel (téléportation)
+    // 2. Les invocations
 
-    // Pattern circulaire prévisible
-    const driftAngle = time * 0.001;
-    const targetX = Math.cos(driftAngle) * speed;
-    const targetY = Math.sin(driftAngle * 0.5) * speed * 0.3;
+    // === IDLE: Flotte sur place, aura mystique ===
+    this.setBossTargetVelocity(0, 0);
 
-    // Rester dans la zone haute
-    if (this.boss.y > 250) {
-      this.setBossTargetVelocity(targetX, -speed * 0.4);
-    } else if (this.boss.y < 100) {
-      this.setBossTargetVelocity(targetX, speed * 0.2);
-    } else {
-      this.setBossTargetVelocity(targetX, targetY);
+    // Lévitation subtile sur place
+    if (!this.summonerFloatTween || !this.summonerFloatTween.isPlaying()) {
+      const baseY = this.boss.y;
+      this.summonerFloatTween = this.tweens.add({
+        targets: this.boss,
+        y: baseY - 10,
+        duration: 2000,
+        yoyo: true,
+        repeat: 0,
+        ease: 'Sine.easeInOut'
+      });
     }
+
+    // Aura mystique qui pulse
+    if (!this.summonerAuraTween || !this.summonerAuraTween.isPlaying()) {
+      this.summonerAuraTween = this.tweens.add({
+        targets: this.boss,
+        alpha: { from: 1, to: 0.85 },
+        duration: 1200,
+        yoyo: true,
+        repeat: 0,
+        ease: 'Sine.easeInOut'
+      });
+    }
+
+    // Particules de magie qui orbitent autour du mage
+    if (Math.random() < 0.06) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 35;
+      this.emitParticles(
+        this.boss.x + Math.cos(angle) * dist,
+        this.boss.y + Math.sin(angle) * dist,
+        {
+          count: 1,
+          colors: [0xff00ff, 0xaa00aa, 0xff66ff, 0xcc00cc],
+          minSpeed: 15,
+          maxSpeed: 35,
+          minSize: 2,
+          maxSize: 5,
+          life: 500,
+          angle: angle + Math.PI / 2, // Orbite
+          spread: 0.2,
+          fadeOut: true
+        }
+      );
+    }
+
+    // === REPOSITIONNEMENT OCCASIONNEL ===
+    // Téléporte vers une meilleure position si joueur trop proche ou trop loin
+    const toPlayerX = this.player.x - this.boss.x;
+    const toPlayerY = this.player.y - this.boss.y;
+    const distToPlayer = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY);
+
+    // Si joueur trop proche, téléportation défensive
+    if (distToPlayer < 100 && !this.summonerTeleportCooldown) {
+      this.summonerRepositionTeleport();
+    }
+  }
+
+  summonerRepositionTeleport() {
+    if (!this.boss || !this.boss.active) return;
+    if (this.summonerTeleportCooldown) return;
+
+    this.summonerTeleportCooldown = true;
+    this.summonerState = 'repositioning';
+
+    // Particules de disparition
+    this.emitParticles(this.boss.x, this.boss.y, {
+      count: 15,
+      colors: [0xff00ff, 0xaa00aa, 0xffffff],
+      minSpeed: 50,
+      maxSpeed: 100,
+      minSize: 3,
+      maxSize: 7,
+      life: 400,
+      spread: Math.PI * 2,
+      fadeOut: true
+    });
+
+    // Fade out
+    this.tweens.add({
+      targets: this.boss,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => {
+        if (!this.boss || !this.boss.active) return;
+
+        // Nouvelle position: loin du joueur, en hauteur
+        const side = this.player.x < this.WORLD.width / 2 ? 1 : -1;
+        const newX = this.WORLD.width / 2 + side * (150 + Math.random() * 100);
+        const newY = 100 + Math.random() * 80;
+
+        this.boss.x = Math.max(100, Math.min(this.WORLD.width - 100, newX));
+        this.boss.y = newY;
+
+        // Fade in
+        this.tweens.add({
+          targets: this.boss,
+          alpha: 1,
+          duration: 300,
+          onComplete: () => {
+            this.summonerState = 'drifting';
+          }
+        });
+
+        // Particules de réapparition
+        this.emitParticles(this.boss.x, this.boss.y, {
+          count: 12,
+          colors: [0xff00ff, 0xaa00aa],
+          minSpeed: 30,
+          maxSpeed: 70,
+          minSize: 2,
+          maxSize: 5,
+          life: 300,
+          spread: Math.PI * 2,
+          fadeOut: true
+        });
+      }
+    });
+
+    // Cooldown de téléportation
+    this.time.delayedCall(4000, () => this.summonerTeleportCooldown = false);
   }
 
   bossSummonerSummonWindUp() {
@@ -6752,7 +7983,7 @@ class GameScene extends Phaser.Scene {
       this.scoreText.setText(this.score.toString().padStart(6, '0'));
       player.body.setVelocityY(-300);
     } else {
-      this.takeDamage();
+      this.takeDamage(3); // Ennemis invoqués = 3/4 coeur
     }
   }
 
@@ -6822,6 +8053,10 @@ class GameScene extends Phaser.Scene {
 
     this.crusherSlamming = true;
 
+    // SFX de préparation
+    this.playSound('bossWarning');
+    this.playSound('bossCharge');
+
     // Animation de préparation (monte légèrement)
     this.tweens.add({
       targets: this.boss,
@@ -6844,6 +8079,9 @@ class GameScene extends Phaser.Scene {
           ease: 'Quad.easeIn',
           onComplete: () => {
             if (!this.boss || !this.boss.active) return;
+
+            // SFX d'impact dévastateur
+            this.playSound('bossSlam');
 
             // Impact au sol
             this.cameras.main.shake(400, 0.03);
@@ -6913,7 +8151,7 @@ class GameScene extends Phaser.Scene {
         const playerOnGround = this.player.body.blocked.down || this.player.body.touching.down;
 
         if (playerOnGround && this.player.x > waveLeft && this.player.x < waveRight) {
-          this.takeDamage();
+          this.takeDamage(6); // Onde de choc de CRUSHER = 1.5 coeurs
         }
       }
     });
@@ -6958,7 +8196,7 @@ class GameScene extends Phaser.Scene {
       // Collision avec joueur
       this.physics.add.overlap(this.player, rock, () => {
         if (!this.isInvincible) {
-          this.takeDamage();
+          this.takeDamage(6); // Rocher de CRUSHER = 1.5 coeurs
           // Explosion du rocher
           this.emitParticles(rock.x, rock.y, {
             count: 15,
@@ -7214,7 +8452,7 @@ class GameScene extends Phaser.Scene {
             this.phantomClones = this.phantomClones.filter(x => x.active);
             p.body.setVelocityY(-300);
           } else {
-            this.takeDamage();
+            this.takeDamage(3); // Clone Phantom = 3/4 coeur
           }
         });
       });
@@ -7702,7 +8940,7 @@ class GameScene extends Phaser.Scene {
           callback: () => {
             if (!this.player || this.isInvincible) return;
             if (Math.abs(this.player.y - laserY) < 20) {
-              this.takeDamage();
+              this.takeDamage(6); // Laser de TWINS = 1.5 coeurs
             }
           }
         });
@@ -7908,7 +9146,7 @@ class GameScene extends Phaser.Scene {
             this.twin2.x, this.twin2.y
           );
           if (dist < 25) {
-            this.takeDamage();
+            this.takeDamage(8); // Lien électrique de TWINS = 2 coeurs (attaque spéciale)
           }
         }
       });
@@ -8006,7 +9244,7 @@ class GameScene extends Phaser.Scene {
         this.bossShootTimer.delay = 1500;
       }
     } else {
-      this.takeDamage();
+      this.takeDamage(6); // Contact avec TWINS = 1.5 coeurs
     }
   }
 
@@ -8051,6 +9289,12 @@ class GameScene extends Phaser.Scene {
       if (oldest) oldest.destroy();
     }
 
+    // SFX de tir (throttlé pour ne pas spammer)
+    if (!this.lastBulletSfxTime || this.time.now - this.lastBulletSfxTime > 80) {
+      this.playSound('bossBullet');
+      this.lastBulletSfxTime = this.time.now;
+    }
+
     const colors = {
       1: { fill: 0xff00ff, stroke: 0xaa00aa },
       2: { fill: 0x00ffff, stroke: 0x00aaaa },
@@ -8077,6 +9321,26 @@ class GameScene extends Phaser.Scene {
     this.bullets.add(bullet);
     bullet.body.setAllowGravity(false);
     bullet.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+
+    // Dégâts des projectiles de boss (basé sur type de boss et perçant)
+    // 1 HP = 1/4 coeur, 2 HP = 1/2 coeur, 4 HP = 1 coeur
+    if (piercing) {
+      // Projectiles perçants = 3/4 coeur (dangereux car traversent)
+      bullet.damage = 3;
+    } else {
+      // Projectiles normaux par type de boss
+      const bossDamage = {
+        1: 2,  // CHARGER: 1/2 coeur
+        2: 2,  // SPINNER: 1/2 coeur
+        3: 2,  // SPLITTER: 1/2 coeur
+        4: 3,  // GUARDIAN: 3/4 coeur (tir lourd)
+        5: 2,  // SUMMONER: 1/2 coeur
+        6: 3,  // CRUSHER: 3/4 coeur (tir puissant)
+        7: 2,  // PHANTOM: 1/2 coeur
+        8: 2   // BERSERKER: 1/2 coeur (compense par le volume)
+      };
+      bullet.damage = bossDamage[this.bossType] || 2;
+    }
 
     // Particules de tir (muzzle flash)
     this.particleBossShoot(x, y, angle, color.fill, piercing);
@@ -8244,6 +9508,9 @@ class GameScene extends Phaser.Scene {
       this.playSound('bossHit');
       this.particleBossHit(boss.x, boss.y, this.bossColor);
 
+      // === CRI DE DOULEUR DU BOSS ===
+      this.bossHurtCry(boss);
+
       this.bossHealth--;
       this.updateBossHealthBar();
       player.body.setVelocityY(-550); // Rebond plus fort pour éloigner le joueur
@@ -8378,8 +9645,23 @@ class GameScene extends Phaser.Scene {
         this.defeatBoss();
       }
     } else if (!this.isInvincible && !this.bossHitCooldown) {
-      // Dégâts seulement si joueur pas invincible ET boss pas en cooldown
-      this.takeDamage();
+      // Dégâts dynamiques selon le boss et son état
+      let damage = 6; // Contact normal = 1.5 coeurs
+
+      // CHARGER en charge = 2 coeurs
+      if (this.bossType === 1 && this.chargerState === 'charging') {
+        damage = 8;
+      }
+      // CRUSHER slam = 2.5 coeurs
+      else if (this.bossType === 6 && this.crusherSlamming) {
+        damage = 10;
+      }
+      // BERSERKER enragé = 2 coeurs
+      else if (this.bossType === 8 && this.berserkerRage > 0.5) {
+        damage = 8;
+      }
+
+      this.takeDamage(damage);
     }
   }
 
@@ -8415,13 +9697,101 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  // === CRI DE DOULEUR DU BOSS ===
+  bossHurtCry(boss) {
+    if (!boss || !boss.active) return;
+
+    // === SON DE CRI DE DOULEUR ===
+    this.playSound('bossHurtCry');
+
+    // Animation de "cri" - le boss se contracte et émet des particules de douleur
+    // Utiliser boss directement car bossVisuals peut être un container sans setTint
+    const visualTarget = boss;
+
+    // Contraction rapide (comme une réaction à la douleur)
+    this.tweens.add({
+      targets: visualTarget,
+      scaleX: 0.85, scaleY: 1.15,
+      duration: 80,
+      yoyo: true,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        if (visualTarget && visualTarget.active) {
+          this.tweens.add({
+            targets: visualTarget,
+            scaleX: 1.1, scaleY: 0.9,
+            duration: 60,
+            yoyo: true,
+            ease: 'Quad.easeIn'
+          });
+        }
+      }
+    });
+
+    // Particules de "cri" - ondes qui émanent du boss
+    for (let wave = 0; wave < 3; wave++) {
+      this.time.delayedCall(wave * 50, () => {
+        if (!boss || !boss.active) return;
+
+        // Particules en forme d'arc vers le haut (comme un cri)
+        const numParticles = 8;
+        for (let i = 0; i < numParticles; i++) {
+          const angle = -Math.PI / 2 + (i - numParticles / 2) * 0.15;
+          const speed = 60 + wave * 30;
+
+          const particle = this.add.circle(
+            boss.x,
+            boss.y - 20,
+            3 + wave,
+            this.bossColor || 0xff0000
+          );
+          particle.setAlpha(0.8 - wave * 0.2);
+
+          this.tweens.add({
+            targets: particle,
+            x: boss.x + Math.cos(angle) * speed,
+            y: boss.y - 20 + Math.sin(angle) * speed,
+            alpha: 0,
+            scale: 0.3,
+            duration: 300 + wave * 50,
+            ease: 'Quad.easeOut',
+            onComplete: () => { if (particle && particle.active) particle.destroy(); }
+          });
+        }
+      });
+    }
+
+    // Léger flash de douleur sur le boss (seulement si setTint existe)
+    if (visualTarget && typeof visualTarget.setTint === 'function') {
+      visualTarget.setTint(0xffffff);
+      this.time.delayedCall(100, () => {
+        if (visualTarget && visualTarget.active && typeof visualTarget.clearTint === 'function') {
+          visualTarget.clearTint();
+        }
+      });
+    }
+
+    // Tremblement de caméra subtil
+    this.cameras.main.shake(100, 0.005);
+
+    // Effet visuel (aberration chromatique légère)
+    if (this.chromaRed) {
+      this.bossHitVisualEffect();
+    }
+  }
+
   defeatBoss() {
     // Éviter les appels multiples
     if (this.bossDefeated) return;
     this.bossDefeated = true;
 
-    // Arrêter la musique du boss
-    this.stopMusic();
+    // Sauvegarder la position du boss pour l'animation
+    const bossX = this.boss.x;
+    const bossY = this.boss.y;
+    const bossColor = this.bossColor || 0xff00ff;
+
+    // Arrêter la musique du boss INSTANTANÉMENT (sans fondu)
+    this.stopMusicInstant();
 
     // Arrêter les particules ambiantes du boss
     if (this.bossParticleInterval) {
@@ -8429,109 +9799,357 @@ class GameScene extends Phaser.Scene {
       this.bossParticleInterval = null;
     }
 
-    // CHECKPOINT : Sauvegarder la progression après avoir battu le boss
-    const checkpointData = {
-      level: this.currentLevel + 1, // On reprend au niveau suivant
-      score: this.score + 500, // Score avec le bonus boss
-      totalTime: this.totalTime + this.levelTime,
-      maxHealth: this.maxHealth
-    };
-    localStorage.setItem('platformer-checkpoint', JSON.stringify(checkpointData));
-    this.checkpoint = checkpointData;
-
-    // Restaurer la vie au max après avoir battu un boss !
-    this.playerHealth = this.maxHealth * 4;
-    this.updateHealthDisplay();
-
-    // SFX + Particules de victoire
-    this.playSound('bossDefeat');
-    this.particleBossDefeat(this.boss.x, this.boss.y, this.bossColor || 0xff00ff);
-
-    // Détruire la hitbox et les visuels
-    this.boss.destroy();
-    if (this.bossVisuals) {
-      this.bossVisuals.destroy();
-      this.bossVisuals = null;
-    }
-
-    // Détruire les éléments de l'œil
-    if (this.bossEye) { this.bossEye.destroy(); this.bossEye = null; }
-    if (this.bossPupil) { this.bossPupil.destroy(); this.bossPupil = null; }
-    if (this.bossEyeGlint) { this.bossEyeGlint.destroy(); this.bossEyeGlint = null; }
-    if (this.bossEyelidTop) { this.bossEyelidTop.destroy(); this.bossEyelidTop = null; }
-    if (this.bossEyelidBottom) { this.bossEyelidBottom.destroy(); this.bossEyelidBottom = null; }
-    if (this.bossBlinkTimer) { this.bossBlinkTimer.remove(); this.bossBlinkTimer = null; }
-
-    // Nettoyage spécifique à chaque boss
-    if (this.bossType === 3 && this.splitterMinions) {
-      this.splitterMinions.forEach(m => {
-        if (m.shootTimer) m.shootTimer.remove();
-        if (m.active) m.destroy();
-      });
-      this.splitterMinions = [];
-    }
-    if (this.bossType === 4 && this.guardianShieldSprite) {
-      this.guardianShieldSprite.destroy();
-    }
-    if (this.bossType === 5 && this.summonedEnemies) {
-      this.summonedEnemies.forEach(e => { if (e.active) e.destroy(); });
-      this.summonedEnemies = [];
-    }
-
-    // Animation de sortie de l'UI boss
-    if (this.bossUIContainer) {
-      this.tweens.add({
-        targets: this.bossUIContainer,
-        alpha: 0,
-        y: 60,
-        duration: 300,
-        onComplete: () => {
-          if (this.bossUIContainer) this.bossUIContainer.destroy();
-        }
-      });
-    }
+    // Arrêter les timers du boss
     if (this.bossMoveTimer) this.bossMoveTimer.remove();
     if (this.bossShootTimer) this.bossShootTimer.remove();
 
-    this.score +=500;
-    this.scoreText.setText(this.score.toString().padStart(6, '0'));
+    // === DARK SOULS DEATH ANIMATION ===
+    // 1. Freeze le boss et ralentir le temps
+    this.boss.body.setVelocity(0, 0);
+    this.boss.body.setAllowGravity(false);
 
-    // Faire apparaître la clé (sans animation de flottement pendant la chute)
-    this.key = this.createKeySprite(400, 300, true);
-    this.physics.add.existing(this.key);
-    this.key.body.setSize(16, 28); // Taille du sprite original
-    this.key.body.setAllowGravity(true);
-    this.key.body.setGravityY(200); // Chute lente
+    // SFX du cri de mort (son dramatique)
+    this.playSound('bossDeathCry');
 
-    // Quand la clé atterrit, démarrer l'animation de flottement
-    this.keyLanded = false;
-    this.physics.add.collider(this.key, this.platforms, () => {
-      if (!this.keyLanded && this.key) {
-        this.keyLanded = true;
-        // Arrêter la physique
-        this.key.body.setAllowGravity(false);
-        this.key.body.setVelocity(0, 0);
-        const landY = this.key.y;
-        // Démarrer l'animation de flottement
+    // 2. CRI DE MORT - Le boss émet un dernier cri déchirant
+    this.bossDeathCry(bossX, bossY, bossColor);
+
+    // Fanfare de victoire après un délai (quand l'animation est terminée)
+    this.time.delayedCall(2500, () => {
+      this.playSound('bossDefeat');
+    });
+
+    // Effets visuels dramatiques (vignette + aberration chromatique forte)
+    if (this.chromaRed) {
+      this.bossDeathVisualEffect();
+    }
+
+    // 3. Flash initial de douleur
+    this.cameras.main.flash(200, 255, 255, 255);
+    this.cameras.main.shake(500, 0.02);
+
+    // 4. Animation de mort lente et dramatique
+    const visualTargets = [this.boss, this.bossVisuals, this.bossEye, this.bossPupil].filter(t => t && t.active !== false);
+
+    // Phase 1: Expansion de douleur (0-800ms)
+    this.tweens.add({
+      targets: visualTargets,
+      scaleX: 1.5,
+      scaleY: 0.7,
+      duration: 400,
+      ease: 'Quad.easeOut',
+      yoyo: true,
+      onComplete: () => {
+        // Phase 2: Contraction d'agonie (800-1600ms)
         this.tweens.add({
-          targets: this.key,
-          y: landY - 8,
-          duration: 1000,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut'
-        });
-        this.tweens.add({
-          targets: this.key,
-          angle: { from: -5, to: 5 },
-          duration: 1500,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut'
+          targets: visualTargets,
+          scaleX: 0.6,
+          scaleY: 1.4,
+          duration: 400,
+          ease: 'Quad.easeIn',
+          yoyo: true
         });
       }
     });
-    this.physics.add.overlap(this.player, this.key, this.collectKey, null, this);
+
+    // 5. Particules d'essence qui s'échappent pendant l'agonie
+    const essenceInterval = setInterval(() => {
+      if (!this.boss || !this.boss.active) {
+        clearInterval(essenceInterval);
+        return;
+      }
+
+      // Lumière qui s'échappe du boss
+      for (let i = 0; i < 5; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 20 + Math.random() * 30;
+
+        // Couleur alternée entre la couleur du boss et blanc
+        const essenceColor = Math.random() > 0.5 ? bossColor : 0xffffff;
+
+        const essence = this.add.circle(
+          this.boss.x + Math.cos(angle) * dist,
+          this.boss.y + Math.sin(angle) * dist,
+          2 + Math.random() * 4,
+          essenceColor
+        );
+
+        this.tweens.add({
+          targets: essence,
+          x: essence.x + (Math.random() - 0.5) * 100,
+          y: essence.y - 50 - Math.random() * 100,
+          alpha: 0,
+          scale: 0,
+          duration: 800 + Math.random() * 400,
+          ease: 'Quad.easeOut',
+          onComplete: () => { if (essence && essence.active) essence.destroy(); }
+        });
+      }
+    }, 100);
+
+    // 6. Fade progressif du boss
+    this.tweens.add({
+      targets: visualTargets,
+      alpha: 0.3,
+      duration: 1500,
+      ease: 'Sine.easeIn'
+    });
+
+    // 7. Après 2 secondes - Désintégration finale
+    this.time.delayedCall(2000, () => {
+      clearInterval(essenceInterval);
+
+      // Animation de désintégration finale
+      const finalX = this.boss ? this.boss.x : bossX;
+      const finalY = this.boss ? this.boss.y : bossY;
+
+      // Vagues de particules qui s'échappent
+      for (let wave = 0; wave < 4; wave++) {
+        this.time.delayedCall(wave * 150, () => {
+          // Explosion de particules en cercle
+          const numParticles = 20;
+          for (let i = 0; i < numParticles; i++) {
+            const angle = (i / numParticles) * Math.PI * 2;
+            const speed = 100 + wave * 50;
+
+            const particle = this.add.circle(finalX, finalY, 4 + wave * 2, bossColor);
+            particle.setAlpha(0.9 - wave * 0.15);
+
+            this.tweens.add({
+              targets: particle,
+              x: finalX + Math.cos(angle) * speed * 2,
+              y: finalY + Math.sin(angle) * speed * 2,
+              alpha: 0,
+              scale: 0.2,
+              duration: 600 + wave * 100,
+              ease: 'Quad.easeOut',
+              onComplete: () => { if (particle && particle.active) particle.destroy(); }
+            });
+          }
+
+          // Trainées de lumière vers le haut (âme qui s'échappe)
+          for (let i = 0; i < 8; i++) {
+            const offsetX = (Math.random() - 0.5) * 60;
+            const light = this.add.circle(finalX + offsetX, finalY, 3 + Math.random() * 5, 0xffffff);
+            light.setAlpha(0.8);
+
+            this.tweens.add({
+              targets: light,
+              y: finalY - 200 - Math.random() * 150,
+              x: finalX + offsetX + (Math.random() - 0.5) * 50,
+              alpha: 0,
+              scale: 0.1,
+              duration: 1200 + Math.random() * 600,
+              ease: 'Sine.easeOut',
+              onComplete: () => { if (light && light.active) light.destroy(); }
+            });
+          }
+        });
+      }
+
+      // 8. Flash final et destruction du boss
+      this.time.delayedCall(600, () => {
+        // Flash blanc dramatique
+        this.cameras.main.flash(400, 255, 255, 255);
+
+        // Détruire tous les éléments du boss
+        if (this.boss && this.boss.active) this.boss.destroy();
+        if (this.bossVisuals) { this.bossVisuals.destroy(); this.bossVisuals = null; }
+        if (this.bossEye) { this.bossEye.destroy(); this.bossEye = null; }
+        if (this.bossPupil) { this.bossPupil.destroy(); this.bossPupil = null; }
+        if (this.bossEyeGlint) { this.bossEyeGlint.destroy(); this.bossEyeGlint = null; }
+        if (this.bossEyelidTop) { this.bossEyelidTop.destroy(); this.bossEyelidTop = null; }
+        if (this.bossEyelidBottom) { this.bossEyelidBottom.destroy(); this.bossEyelidBottom = null; }
+        if (this.bossBlinkTimer) { this.bossBlinkTimer.remove(); this.bossBlinkTimer = null; }
+
+        // Nettoyage spécifique à chaque boss
+        if (this.bossType === 3 && this.splitterMinions) {
+          this.splitterMinions.forEach(m => {
+            if (m.shootTimer) m.shootTimer.remove();
+            if (m.active) m.destroy();
+          });
+          this.splitterMinions = [];
+        }
+        if (this.bossType === 4 && this.guardianShieldSprite) {
+          this.guardianShieldSprite.destroy();
+        }
+        if (this.bossType === 5 && this.summonedEnemies) {
+          this.summonedEnemies.forEach(e => { if (e.active) e.destroy(); });
+          this.summonedEnemies = [];
+        }
+
+        // Animation de sortie de l'UI boss
+        if (this.bossUIContainer) {
+          this.tweens.add({
+            targets: this.bossUIContainer,
+            alpha: 0,
+            y: 60,
+            duration: 500,
+            onComplete: () => {
+              if (this.bossUIContainer) this.bossUIContainer.destroy();
+            }
+          });
+        }
+
+        // === AFTERMATH - Clé et récompenses ===
+        this.time.delayedCall(500, () => {
+          // CHECKPOINT : Sauvegarder la progression
+          const checkpointData = {
+            level: this.currentLevel + 1,
+            score: this.score + 500,
+            totalTime: this.totalTime + this.levelTime,
+            maxHealth: this.maxHealth
+          };
+          localStorage.setItem('platformer-checkpoint', JSON.stringify(checkpointData));
+          this.checkpoint = checkpointData;
+
+          // Restaurer la vie
+          this.playerHealth = this.maxHealth * 4;
+          this.updateHealthDisplay();
+
+          this.score += 500;
+          this.scoreText.setText(this.score.toString().padStart(6, '0'));
+
+          // Faire apparaître la clé avec un effet dramatique
+          this.spawnKeyAfterBoss(finalX, finalY);
+        });
+      });
+    });
+  }
+
+  // === CRI DE MORT DU BOSS (Dark Souls style) ===
+  bossDeathCry(x, y, color) {
+    // Ondes de choc concentriques (utiliser scale au lieu de radius)
+    for (let ring = 0; ring < 5; ring++) {
+      this.time.delayedCall(ring * 120, () => {
+        const shockwave = this.add.circle(x, y, 20, color, 0);
+        shockwave.setStrokeStyle(4 - ring * 0.5, color);
+        shockwave.setAlpha(1 - ring * 0.15);
+
+        this.tweens.add({
+          targets: shockwave,
+          scaleX: 8 + ring * 2,
+          scaleY: 8 + ring * 2,
+          alpha: 0,
+          duration: 600 + ring * 100,
+          ease: 'Quad.easeOut',
+          onComplete: () => { if (shockwave && shockwave.active) shockwave.destroy(); }
+        });
+      });
+    }
+
+    // Particules qui montent comme un cri visuel
+    for (let i = 0; i < 30; i++) {
+      const delay = Math.random() * 300;
+      this.time.delayedCall(delay, () => {
+        const offsetX = (Math.random() - 0.5) * 80;
+        const particleColor = Math.random() > 0.5 ? color : 0xffffff;
+        const particle = this.add.circle(
+          x + offsetX,
+          y,
+          2 + Math.random() * 4,
+          particleColor
+        );
+
+        this.tweens.add({
+          targets: particle,
+          y: y - 100 - Math.random() * 150,
+          x: x + offsetX + (Math.random() - 0.5) * 40,
+          alpha: 0,
+          scale: 0.3,
+          duration: 800 + Math.random() * 600,
+          ease: 'Quad.easeOut',
+          onComplete: () => { if (particle && particle.active) particle.destroy(); }
+        });
+      });
+    }
+  }
+
+  // === SPAWN DE LA CLÉ APRÈS BOSS (avec effet) ===
+  spawnKeyAfterBoss(x, y) {
+    // Particules de lumière avant l'apparition de la clé
+    for (let i = 0; i < 20; i++) {
+      const angle = (i / 20) * Math.PI * 2;
+      const dist = 80;
+      const light = this.add.circle(
+        x + Math.cos(angle) * dist,
+        y + Math.sin(angle) * dist,
+        4,
+        0xffdd44
+      );
+      light.setAlpha(0.8);
+
+      this.tweens.add({
+        targets: light,
+        x: x,
+        y: y - 50,
+        alpha: 0,
+        scale: 0,
+        duration: 600,
+        ease: 'Quad.easeIn',
+        onComplete: () => { if (light && light.active) light.destroy(); }
+      });
+    }
+
+    this.time.delayedCall(500, () => {
+      // Flash de lumière doré
+      this.cameras.main.flash(200, 255, 220, 100);
+
+      // Création de la clé avec animation d'apparition
+      this.key = this.createKeySprite(x, y - 50, true);
+      this.key.setAlpha(0);
+      this.key.setScale(0);
+      this.physics.add.existing(this.key);
+      this.key.body.setSize(16, 28);
+      this.key.body.setAllowGravity(false);
+
+      // Animation d'apparition
+      this.tweens.add({
+        targets: this.key,
+        alpha: 1,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 400,
+        ease: 'Back.easeOut',
+        onComplete: () => {
+          // La clé est matérialisée - démarrer l'ambiance calme
+          this.startPostBossAmbient();
+
+          // Puis gravité et chute
+          this.key.body.setAllowGravity(true);
+          this.key.body.setGravityY(200);
+
+          // Collision avec le sol
+          this.keyLanded = false;
+          this.physics.add.collider(this.key, this.platforms, () => {
+            if (!this.keyLanded && this.key) {
+              this.keyLanded = true;
+              this.key.body.setAllowGravity(false);
+              this.key.body.setVelocity(0, 0);
+              const landY = this.key.y;
+
+              this.tweens.add({
+                targets: this.key,
+                y: landY - 8,
+                duration: 1000,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+              });
+              this.tweens.add({
+                targets: this.key,
+                angle: { from: -5, to: 5 },
+                duration: 1500,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+              });
+            }
+          });
+          this.physics.add.overlap(this.player, this.key, this.collectKey, null, this);
+        }
+      });
+    });
   }
 
   fallDeath() {
@@ -8596,10 +10214,16 @@ class GameScene extends Phaser.Scene {
       localStorage.setItem('platformer-best-total', JSON.stringify(this.bestTotalTime));
     }
 
-    // Arrêter la musique seulement si on passe à un niveau boss (la musique de niveau continue sinon)
+    // Gestion de la musique lors de la transition
     const nextLevel = this.currentLevel + 1;
     const nextIsBoss = nextLevel % 5 === 0;
-    if (nextIsBoss) {
+    const currentIsBoss = this.currentLevel % 5 === 0;
+
+    if (currentIsBoss && this.isInPostBossAmbient) {
+      // Quitter l'arène du boss - transition de l'ambiance vers musique normale
+      this.transitionToLevelMusic();
+    } else if (nextIsBoss) {
+      // Prochain niveau est un boss - arrêter la musique (silence pour l'intro)
       this.stopMusic();
     }
 
@@ -8635,20 +10259,31 @@ class GameScene extends Phaser.Scene {
       this.scoreText.setText(this.score.toString().padStart(6, '0'));
       player.body.setVelocityY(-300);
     } else {
-      this.takeDamage();
+      // Dégâts variables selon le type d'ennemi (défaut: 3 = 3/4 coeur)
+      const damage = enemy.contactDamage || 3;
+      this.takeDamage(damage);
     }
   }
 
   hitBullet(player, bullet) {
     if (this.isInvincible) return;
-    bullet.destroy();
-    this.takeDamage();
+
+    // Récupérer les dégâts du projectile (défaut: 2 = 1/2 coeur)
+    const damage = bullet.damage || 2;
+
+    // Les projectiles perçants ne sont pas détruits
+    if (!bullet.piercing) {
+      bullet.destroy();
+    }
+
+    this.takeDamage(damage);
   }
 
-  takeDamage() {
+  takeDamage(amount = 4) {
+    // amount: 4 = 1 coeur, 2 = demi-coeur, 6 = 1.5 coeurs, 8 = 2 coeurs
     if (this.isInvincible) return;
 
-    this.playerHealth -= 4; // 1 coeur = 4 HP
+    this.playerHealth -= amount;
     this.updateHealthDisplay();
 
     if (this.playerHealth <= 0) {
@@ -8675,6 +10310,11 @@ class GameScene extends Phaser.Scene {
     // SFX + Particules de dégâts
     this.playSound('hurt');
     this.particleHurt(this.player.x, this.player.y);
+
+    // Effets visuels (vignette rouge + aberration chromatique)
+    if (this.vignetteGraphics) {
+      this.damageVisualEffect();
+    }
 
     this.isInvincible = true;
     this.tweens.add({
@@ -8764,6 +10404,11 @@ class GameScene extends Phaser.Scene {
         this.deltaText.setText(`-${this.formatTime(Math.abs(diff))}`);
         this.deltaText.setFill('#66ff66'); // Vert = en avance
       }
+    }
+
+    // Mise à jour des effets visuels (vignette santé basse)
+    if (this.vignetteGraphics) {
+      this.updateVisualEffects(delta);
     }
 
     // Vérification fiable de chute dans un trou (backup si overlap rate)
