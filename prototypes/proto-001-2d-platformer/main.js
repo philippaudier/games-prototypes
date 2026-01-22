@@ -116,6 +116,7 @@ class GameScene extends Phaser.Scene {
     this.playerScaleX = 1;
     this.lastVelocityY = 0;           // Pour détecter l'atterrissage fort
     this.speedTrail = [];             // Pour les speed lines
+    this.trailSprites = [];           // Sprites de la traînée (reset à chaque niveau!)
 
     // === MONDE ET CAMÉRA ===
     // Monde compact pour niveaux resserrés
@@ -5914,59 +5915,63 @@ class GameScene extends Phaser.Scene {
   // ==========================================
   initBossCharger() {
     // === CHARGER: LE TAUREAU LÉGENDAIRE ===
-    // Premier boss - doit être MÉMORABLE et IMPRESSIONNANT
-    // - Cercle autour du joueur comme un prédateur
-    // - Charges dévastatrices avec wind-up clair
-    // - Tirs en éventail puissants
-    // - Recovery windows pour punir
+    // Premier boss - doit incarner son NOM: IL CHARGE!
+    // - CHARGE est son attaque PRINCIPALE (très fréquente!)
+    // - Combos de charges enchaînées
+    // - Tirs seulement pour punir les joueurs distants
+    // - Recovery windows courts entre les charges
 
     this.chargerState = 'idle'; // idle, winding, charging, recovering, shooting, evading
     this.chargerComboCount = 0;
-    this.chargerLastStateChange = 0; // Pour éviter les états bloqués
+    this.chargerMaxCombo = 2 + this.bossPhase; // Combos de charges!
+    this.chargerLastStateChange = 0;
 
     // Commence mobile
     this.setBossTargetVelocity(0, 0);
 
     // Timer de mouvement - TRÈS fréquent pour être réactif
     this.bossMoveTimer = this.time.addEvent({
-      delay: 100, // Check très fréquent!
+      delay: 100,
       callback: this.bossChargerMove,
       callbackScope: this,
       loop: true
     });
 
-    // Tir en éventail - avec RNG
-    const shootDelay = 1500 + Math.random() * 800;
+    // Tir en éventail - RARE (CHARGER préfère charger!)
+    const shootDelay = 3000 + Math.random() * 1500;
     this.bossShootTimer = this.time.addEvent({
       delay: shootDelay,
       callback: () => {
         this.bossChargerShoot();
-        // Randomiser le prochain délai
-        this.bossShootTimer.delay = 1200 + Math.random() * 1000;
+        // Délai LONG entre les tirs - ce n'est pas son style!
+        this.bossShootTimer.delay = 2500 + Math.random() * 2000;
       },
       callbackScope: this,
       loop: true
     });
 
-    // Charge DÉVASTATRICE - avec RNG
-    const chargeDelay = 2500 + Math.random() * 1000;
+    // === CHARGE! C'EST SON IDENTITÉ! ===
+    // Charges FRÉQUENTES - c'est un CHARGER après tout!
+    const chargeDelay = 1200 + Math.random() * 800;
     this.chargerChargeTimer = this.time.addEvent({
       delay: chargeDelay,
       callback: () => {
         this.bossChargerWindUp();
-        // Randomiser le prochain délai
-        this.chargerChargeTimer.delay = 2000 + Math.random() * 1500;
+        // Délai COURT entre les charges - il ADORE charger!
+        // Plus agressif en phases avancées
+        const baseDelay = Math.max(800, 1500 - this.bossPhase * 200);
+        this.chargerChargeTimer.delay = baseDelay + Math.random() * 700;
       },
       callbackScope: this,
       loop: true
     });
 
-    // Rugissement périodique (intimidation) - avec RNG
+    // Rugissement - intimide et annonce une série de charges
     this.chargerRoarTimer = this.time.addEvent({
-      delay: 4000 + Math.random() * 2000,
+      delay: 5000 + Math.random() * 3000,
       callback: () => {
         this.bossChargerRoar();
-        this.chargerRoarTimer.delay = 4000 + Math.random() * 3000;
+        this.chargerRoarTimer.delay = 6000 + Math.random() * 4000;
       },
       callbackScope: this,
       loop: true
@@ -5977,7 +5982,6 @@ class GameScene extends Phaser.Scene {
       delay: 500,
       callback: () => {
         if (!this.boss || !this.boss.active) return;
-        // Si l'état n'a pas changé depuis 3 secondes et n'est pas idle, forcer idle
         if (this.chargerState !== 'idle' &&
             this.time.now - this.chargerLastStateChange > 3000) {
           this.chargerState = 'idle';
@@ -6239,9 +6243,23 @@ class GameScene extends Phaser.Scene {
     // Désactiver les collisions avec les murs pendant la charge
     this.boss.body.setCollideWorldBounds(false);
 
-    // === CHARGE! - Plus puissante et impressionnante ===
-    const chargeForce = 750 + (this.bossPhase - 1) * 150;
-    this.bossLunge(dirX, dirY * 0.2, chargeForce);
+    // === CHARGE! - Vélocité directe (bypass le système de physics smoothing) ===
+    const chargeSpeed = 500 + (this.bossPhase - 1) * 100;
+
+    // Définir la vélocité de charge directement ET la target pour que le système ne freine pas
+    this.boss.body.setVelocity(dirX * chargeSpeed, dirY * chargeSpeed * 0.2);
+    this.boss.targetVelX = dirX * chargeSpeed;
+    this.boss.targetVelY = dirY * chargeSpeed * 0.2;
+
+    // Effet visuel de lunge
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.4,
+      scaleY: 0.7,
+      duration: 100,
+      yoyo: true,
+      ease: 'Quad.easeOut'
+    });
 
     // Screen shake pendant la charge
     this.cameras.main.shake(400, 0.02);
@@ -6392,18 +6410,42 @@ class GameScene extends Phaser.Scene {
         fadeOut: true
       });
 
-      // Retour à idle après recovery (plus court!)
-      this.time.delayedCall(800, () => {
-        if (this.boss && this.boss.active) {
-          this.chargerState = 'idle';
-          this.tweens.add({
-            targets: this.boss,
-            scaleX: 1,
-            scaleY: 1,
-            duration: 200
-          });
-        }
-      });
+      // === COMBO DE CHARGES ===
+      // CHARGER peut enchaîner plusieurs charges d'affilée!
+      this.chargerComboCount = (this.chargerComboCount || 0) + 1;
+      const maxCombo = this.chargerMaxCombo || (2 + this.bossPhase);
+
+      // Probabilité de continuer le combo (diminue avec chaque charge)
+      const continueChance = Math.max(0.3, 0.7 - this.chargerComboCount * 0.15);
+
+      if (this.chargerComboCount < maxCombo && Math.random() < continueChance) {
+        // === ENCHAÎNE UNE AUTRE CHARGE! ===
+        this.time.delayedCall(400, () => {
+          if (this.boss && this.boss.active) {
+            // Grognement de rage - il est lancé!
+            this.playSound('bossWarning');
+            this.chargerState = 'idle';
+            // Déclenche immédiatement une autre charge
+            this.time.delayedCall(100, () => {
+              this.bossChargerWindUp();
+            });
+          }
+        });
+      } else {
+        // Fin du combo - vraie recovery
+        this.chargerComboCount = 0;
+        this.time.delayedCall(800, () => {
+          if (this.boss && this.boss.active) {
+            this.chargerState = 'idle';
+            this.tweens.add({
+              targets: this.boss,
+              scaleX: 1,
+              scaleY: 1,
+              duration: 200
+            });
+          }
+        });
+      }
     });
   }
 
