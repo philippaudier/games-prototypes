@@ -215,58 +215,118 @@ class GameScene extends Phaser.Scene {
       dashJustPressed: false
     };
 
+    // Track which touches are on which buttons
+    this.activeTouches = new Map(); // touchId -> currentInput
+
     // Check if touch device
     const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     if (!isTouchDevice) return;
 
-    // Get touch control elements
-    const touchButtons = document.querySelectorAll('[data-input]');
+    // Helper: activate an input
+    const activateInput = (input, btn) => {
+      if (!input) return;
+      if (btn) btn.classList.add('active');
 
-    touchButtons.forEach(btn => {
-      const input = btn.dataset.input;
-
-      // Touch start
-      btn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        btn.classList.add('active');
-
-        if (input === 'jump') {
+      if (input === 'jump') {
+        if (!this.touchInput.jump) {
           this.touchInput.jump = true;
           this.touchInput.jumpJustPressed = true;
-        } else if (input === 'dash') {
+        }
+      } else if (input === 'dash') {
+        if (!this.touchInput.dash) {
           this.touchInput.dash = true;
           this.touchInput.dashJustPressed = true;
-        } else {
-          this.touchInput[input] = true;
         }
-      }, { passive: false });
+      } else {
+        this.touchInput[input] = true;
+      }
+    };
 
-      // Touch end
-      btn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        btn.classList.remove('active');
+    // Helper: deactivate an input
+    const deactivateInput = (input, btn) => {
+      if (!input) return;
+      if (btn) btn.classList.remove('active');
 
-        if (input === 'jump') {
-          this.touchInput.jump = false;
-        } else if (input === 'dash') {
-          this.touchInput.dash = false;
-        } else {
-          this.touchInput[input] = false;
+      if (input === 'jump') {
+        this.touchInput.jump = false;
+      } else if (input === 'dash') {
+        this.touchInput.dash = false;
+      } else {
+        this.touchInput[input] = false;
+      }
+    };
+
+    // Helper: get button and input from touch position
+    const getButtonAtPoint = (x, y) => {
+      const element = document.elementFromPoint(x, y);
+      if (element && element.dataset && element.dataset.input) {
+        return { btn: element, input: element.dataset.input };
+      }
+      // Check parent (in case touch is on child element)
+      if (element && element.parentElement && element.parentElement.dataset && element.parentElement.dataset.input) {
+        return { btn: element.parentElement, input: element.parentElement.dataset.input };
+      }
+      return { btn: null, input: null };
+    };
+
+    // Global touch handlers on document for sliding detection
+    document.addEventListener('touchstart', (e) => {
+      for (const touch of e.changedTouches) {
+        const { btn, input } = getButtonAtPoint(touch.clientX, touch.clientY);
+        if (input) {
+          e.preventDefault();
+          this.activeTouches.set(touch.identifier, input);
+          activateInput(input, btn);
         }
-      }, { passive: false });
+      }
+    }, { passive: false });
 
-      // Touch cancel (e.g., finger moves off button)
-      btn.addEventListener('touchcancel', (e) => {
-        btn.classList.remove('active');
-        if (input === 'jump') {
-          this.touchInput.jump = false;
-        } else if (input === 'dash') {
-          this.touchInput.dash = false;
-        } else {
-          this.touchInput[input] = false;
+    document.addEventListener('touchmove', (e) => {
+      for (const touch of e.changedTouches) {
+        const { btn, input } = getButtonAtPoint(touch.clientX, touch.clientY);
+        const prevInput = this.activeTouches.get(touch.identifier);
+
+        // Si le doigt a glissé vers un autre bouton
+        if (prevInput !== input) {
+          // Désactiver l'ancien bouton
+          if (prevInput) {
+            const prevBtn = document.querySelector(`[data-input="${prevInput}"]`);
+            deactivateInput(prevInput, prevBtn);
+          }
+
+          // Activer le nouveau bouton
+          if (input) {
+            e.preventDefault();
+            activateInput(input, btn);
+            this.activeTouches.set(touch.identifier, input);
+          } else {
+            this.activeTouches.delete(touch.identifier);
+          }
         }
-      }, { passive: false });
-    });
+      }
+    }, { passive: false });
+
+    document.addEventListener('touchend', (e) => {
+      for (const touch of e.changedTouches) {
+        const prevInput = this.activeTouches.get(touch.identifier);
+        if (prevInput) {
+          const prevBtn = document.querySelector(`[data-input="${prevInput}"]`);
+          deactivateInput(prevInput, prevBtn);
+          this.activeTouches.delete(touch.identifier);
+        }
+      }
+    }, { passive: false });
+
+    document.addEventListener('touchcancel', (e) => {
+      for (const touch of e.changedTouches) {
+        const prevInput = this.activeTouches.get(touch.identifier);
+        if (prevInput) {
+          const prevBtn = document.querySelector(`[data-input="${prevInput}"]`);
+          deactivateInput(prevInput, prevBtn);
+          this.activeTouches.delete(touch.identifier);
+        }
+      }
+    }, { passive: false });
 
     // Prevent default touch behaviors on game canvas
     const gameContainer = document.getElementById('game');
