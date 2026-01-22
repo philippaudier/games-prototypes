@@ -215,12 +215,18 @@ class GameScene extends Phaser.Scene {
       dashJustPressed: false
     };
 
-    // Track which touches are on which buttons
-    this.activeTouches = new Map(); // touchId -> currentInput
+    // Track which touches are on which buttons: touchId -> { input, btn }
+    this.activeTouches = new Map();
 
     // Check if touch device
     const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     if (!isTouchDevice) return;
+
+    // Cache all touchable buttons
+    const allButtons = {};
+    document.querySelectorAll('[data-input]').forEach(btn => {
+      allButtons[btn.dataset.input] = btn;
+    });
 
     // Helper: activate an input
     const activateInput = (input, btn) => {
@@ -243,8 +249,9 @@ class GameScene extends Phaser.Scene {
     };
 
     // Helper: deactivate an input
-    const deactivateInput = (input, btn) => {
+    const deactivateInput = (input) => {
       if (!input) return;
+      const btn = allButtons[input];
       if (btn) btn.classList.remove('active');
 
       if (input === 'jump') {
@@ -256,16 +263,48 @@ class GameScene extends Phaser.Scene {
       }
     };
 
-    // Helper: get button and input from touch position
+    // Helper: get button and input from touch position (with proximity for dpad)
     const getButtonAtPoint = (x, y) => {
       const element = document.elementFromPoint(x, y);
+
+      // Direct hit on button
       if (element && element.dataset && element.dataset.input) {
         return { btn: element, input: element.dataset.input };
       }
-      // Check parent (in case touch is on child element)
+      // Check parent (in case touch is on child element like arrow symbol)
       if (element && element.parentElement && element.parentElement.dataset && element.parentElement.dataset.input) {
         return { btn: element.parentElement, input: element.parentElement.dataset.input };
       }
+
+      // If in dpad area but in gap, find closest dpad button
+      const dpad = document.querySelector('.dpad');
+      if (dpad) {
+        const dpadRect = dpad.getBoundingClientRect();
+        if (x >= dpadRect.left && x <= dpadRect.right && y >= dpadRect.top && y <= dpadRect.bottom) {
+          // Find closest directional button
+          let closestBtn = null;
+          let closestDist = Infinity;
+
+          ['left', 'right', 'up', 'down'].forEach(dir => {
+            const btn = allButtons[dir];
+            if (btn) {
+              const rect = btn.getBoundingClientRect();
+              const centerX = rect.left + rect.width / 2;
+              const centerY = rect.top + rect.height / 2;
+              const dist = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+              if (dist < closestDist) {
+                closestDist = dist;
+                closestBtn = btn;
+              }
+            }
+          });
+
+          if (closestBtn && closestDist < 80) {
+            return { btn: closestBtn, input: closestBtn.dataset.input };
+          }
+        }
+      }
+
       return { btn: null, input: null };
     };
 
@@ -275,7 +314,7 @@ class GameScene extends Phaser.Scene {
         const { btn, input } = getButtonAtPoint(touch.clientX, touch.clientY);
         if (input) {
           e.preventDefault();
-          this.activeTouches.set(touch.identifier, input);
+          this.activeTouches.set(touch.identifier, { input, btn });
           activateInput(input, btn);
         }
       }
@@ -284,21 +323,21 @@ class GameScene extends Phaser.Scene {
     document.addEventListener('touchmove', (e) => {
       for (const touch of e.changedTouches) {
         const { btn, input } = getButtonAtPoint(touch.clientX, touch.clientY);
-        const prevInput = this.activeTouches.get(touch.identifier);
+        const prev = this.activeTouches.get(touch.identifier);
+        const prevInput = prev ? prev.input : null;
 
         // Si le doigt a glissé vers un autre bouton
         if (prevInput !== input) {
           // Désactiver l'ancien bouton
           if (prevInput) {
-            const prevBtn = document.querySelector(`[data-input="${prevInput}"]`);
-            deactivateInput(prevInput, prevBtn);
+            deactivateInput(prevInput);
           }
 
           // Activer le nouveau bouton
           if (input) {
             e.preventDefault();
             activateInput(input, btn);
-            this.activeTouches.set(touch.identifier, input);
+            this.activeTouches.set(touch.identifier, { input, btn });
           } else {
             this.activeTouches.delete(touch.identifier);
           }
@@ -308,10 +347,9 @@ class GameScene extends Phaser.Scene {
 
     document.addEventListener('touchend', (e) => {
       for (const touch of e.changedTouches) {
-        const prevInput = this.activeTouches.get(touch.identifier);
-        if (prevInput) {
-          const prevBtn = document.querySelector(`[data-input="${prevInput}"]`);
-          deactivateInput(prevInput, prevBtn);
+        const prev = this.activeTouches.get(touch.identifier);
+        if (prev) {
+          deactivateInput(prev.input);
           this.activeTouches.delete(touch.identifier);
         }
       }
@@ -319,10 +357,9 @@ class GameScene extends Phaser.Scene {
 
     document.addEventListener('touchcancel', (e) => {
       for (const touch of e.changedTouches) {
-        const prevInput = this.activeTouches.get(touch.identifier);
-        if (prevInput) {
-          const prevBtn = document.querySelector(`[data-input="${prevInput}"]`);
-          deactivateInput(prevInput, prevBtn);
+        const prev = this.activeTouches.get(touch.identifier);
+        if (prev) {
+          deactivateInput(prev.input);
           this.activeTouches.delete(touch.identifier);
         }
       }
@@ -6000,13 +6037,29 @@ class GameScene extends Phaser.Scene {
       loop: true
     });
 
-    // Timer d'attaque
+    // Timer d'attaque (plus fréquent!)
     this.chargerAttackTimer = this.time.addEvent({
-      delay: 2000,
+      delay: 1200,
       callback: this.chargerChooseAttack,
       callbackScope: this,
       loop: true
     });
+
+    // Timer de tir (snort fréquent)
+    this.chargerSnortTimer = this.time.addEvent({
+      delay: 1800,
+      callback: () => {
+        if (!this.boss || !this.boss.active) return;
+        if (this.chargerState === 'idle') {
+          this.chargerSnort();
+        }
+      },
+      callbackScope: this,
+      loop: true
+    });
+
+    // Direction d'orbite
+    this.chargerOrbitDir = Math.random() > 0.5 ? 1 : -1;
 
     // Effets d'ambiance (fumée, grattage)
     this.chargerAmbianceTimer = this.time.addEvent({
@@ -6062,30 +6115,50 @@ class GameScene extends Phaser.Scene {
     this.cameras.main.shake(500, 0.02);
   }
 
-  // === MOUVEMENT: PACE MENAÇANT ===
+  // === MOUVEMENT: ORBITE AUTOUR DU JOUEUR ===
   chargerPace() {
     if (!this.boss || !this.boss.active) return;
     if (this.chargerState !== 'idle') return;
 
     const toPlayerX = this.player.x - this.boss.x;
+    const dist = Math.abs(toPlayerX);
     this.chargerFacing = Math.sign(toPlayerX) || 1;
 
-    // Reste au sol, se déplace lentement vers le joueur
-    const idealDist = 200;
-    const dist = Math.abs(toPlayerX);
-    let moveDir = 0;
+    // Orbite: toujours en mouvement autour du joueur
+    const idealDist = 180;
+    const orbitSpeed = this.chargerRageMode ? 200 : 150;
+    const approachSpeed = this.chargerRageMode ? 140 : 100;
 
-    if (dist > idealDist + 50) {
-      moveDir = this.chargerFacing; // Se rapprocher
-    } else if (dist < idealDist - 50) {
-      moveDir = -this.chargerFacing; // Reculer
-    } else {
-      // Petit mouvement latéral menaçant
-      moveDir = Math.sin(this.time.now * 0.002) * 0.5;
+    let moveX = 0;
+
+    // Inverser direction d'orbite parfois
+    if (Math.random() < 0.005) {
+      this.chargerOrbitDir = -this.chargerOrbitDir;
     }
 
-    const speed = this.chargerRageMode ? 120 : 80;
-    this.setBossTargetVelocity(moveDir * speed, 0);
+    // Si trop loin, se rapprocher
+    if (dist > idealDist + 80) {
+      moveX = this.chargerFacing * approachSpeed;
+    }
+    // Si trop proche, reculer en orbite
+    else if (dist < idealDist - 60) {
+      moveX = -this.chargerFacing * approachSpeed * 0.7;
+    }
+    // Sinon orbiter latéralement
+    else {
+      moveX = this.chargerOrbitDir * orbitSpeed;
+    }
+
+    // Rebond sur les murs de l'arène
+    if (this.boss.x <= 100 && moveX < 0) {
+      this.chargerOrbitDir = 1;
+      moveX = orbitSpeed;
+    } else if (this.boss.x >= this.WORLD.width - 100 && moveX > 0) {
+      this.chargerOrbitDir = -1;
+      moveX = -orbitSpeed;
+    }
+
+    this.setBossTargetVelocity(moveX, 0);
 
     // Garder au sol
     this.boss.y = Phaser.Math.Linear(this.boss.y, this.WORLD.groundY - 60, 0.1);
@@ -11200,6 +11273,90 @@ class GameScene extends Phaser.Scene {
       // Friction naturelle quand pas de mouvement intentionnel
       if (Math.abs(enemy.body.velocity.x) < 5) {
         enemy.body.setVelocityX(0);
+      }
+
+      // === ANIMATIONS VISUELLES DYNAMIQUES ===
+      // Initialiser le temps d'animation si pas fait
+      if (enemy.animTime === undefined) {
+        enemy.animTime = Math.random() * Math.PI * 2; // Phase aléatoire
+        enemy.baseScaleX = 1;
+        enemy.baseScaleY = 1;
+      }
+      enemy.animTime += delta * 0.005;
+
+      // Ne pas écraser le scale si en esquive (géré dans le state)
+      if (enemy.aiState !== 'dodge') {
+        const velX = Math.abs(enemy.body.velocity.x);
+        const velY = enemy.body.velocity.y;
+
+        // Bobbing de base (respiration)
+        const breathe = Math.sin(enemy.animTime * 2) * 0.03;
+
+        // Squash/Stretch basé sur la vélocité
+        let scaleX = 1;
+        let scaleY = 1;
+
+        if (velX > 100) {
+          // En mouvement rapide: stretch horizontal
+          const stretchFactor = Math.min(velX / 200, 0.25);
+          scaleX = 1 + stretchFactor;
+          scaleY = 1 - stretchFactor * 0.5;
+        } else if (velX > 30) {
+          // En mouvement lent: léger stretch
+          scaleX = 1.05;
+          scaleY = 0.97;
+        }
+
+        // Au sol en attente: squash
+        if (enemy.body.blocked.down && velX < 10) {
+          const squash = Math.abs(Math.sin(enemy.animTime * 1.5)) * 0.08;
+          scaleX = 1 + squash;
+          scaleY = 1 - squash * 0.5;
+        }
+
+        // En chute: stretch vertical
+        if (velY > 50 && !enemy.body.blocked.down) {
+          scaleX = 0.9;
+          scaleY = 1.15;
+        }
+
+        // Appliquer avec bobbing
+        enemy.setScale(scaleX + breathe * 0.2, scaleY + breathe);
+
+        // Rotation légère basée sur la direction
+        const targetRotation = (enemy.body.velocity.x / 300) * 0.15;
+        enemy.rotation = Phaser.Math.Linear(enemy.rotation || 0, targetRotation, 0.1);
+      }
+
+      // Particules occasionnelles selon l'état
+      if (enemy.aiState === 'attack' && Math.random() < 0.2) {
+        // Particules de rage pendant l'attaque
+        this.emitParticles(enemy.x, enemy.y - 5, {
+          count: 2,
+          colors: [0xff4444, 0xff6666],
+          minSpeed: 20,
+          maxSpeed: 40,
+          minSize: 2,
+          maxSize: 4,
+          life: 150,
+          spread: Math.PI,
+          angle: -Math.PI / 2,
+          fadeOut: true
+        });
+      } else if (enemy.aiState === 'alert' && Math.random() < 0.1) {
+        // Point d'exclamation effect (particule jaune)
+        this.emitParticles(enemy.x, enemy.y - 20, {
+          count: 1,
+          colors: [0xffff00],
+          minSpeed: 5,
+          maxSpeed: 15,
+          minSize: 3,
+          maxSize: 5,
+          life: 300,
+          spread: 0.3,
+          angle: -Math.PI / 2,
+          fadeOut: true
+        });
       }
     });
 
