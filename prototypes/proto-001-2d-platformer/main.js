@@ -112,6 +112,7 @@ class GameScene extends Phaser.Scene {
     this.dashDir = { x: 0, y: 0 };    // Direction du dash
     this.hasDashedInAir = false;      // A déjà dashé en l'air
     this.isClimbing = false;          // En train de grimper
+    this.isCrouching = false;         // En train de se baisser
     this.playerScaleY = 1;            // Pour squash/stretch
     this.playerScaleX = 1;
     this.lastVelocityY = 0;           // Pour détecter l'atterrissage fort
@@ -5951,16 +5952,16 @@ class GameScene extends Phaser.Scene {
     });
 
     // === CHARGE! C'EST SON IDENTITÉ! ===
-    // Charges FRÉQUENTES - c'est un CHARGER après tout!
-    const chargeDelay = 1200 + Math.random() * 800;
+    // Charges puissantes qui traversent toute l'arène
+    const chargeDelay = 2500 + Math.random() * 1000;
     this.chargerChargeTimer = this.time.addEvent({
       delay: chargeDelay,
       callback: () => {
         this.bossChargerWindUp();
-        // Délai COURT entre les charges - il ADORE charger!
+        // Délai raisonnable entre les grosses charges
         // Plus agressif en phases avancées
-        const baseDelay = Math.max(800, 1500 - this.bossPhase * 200);
-        this.chargerChargeTimer.delay = baseDelay + Math.random() * 700;
+        const baseDelay = Math.max(1800, 3000 - this.bossPhase * 300);
+        this.chargerChargeTimer.delay = baseDelay + Math.random() * 1000;
       },
       callbackScope: this,
       loop: true
@@ -6034,58 +6035,47 @@ class GameScene extends Phaser.Scene {
     if (!this.boss || !this.boss.active) return;
     if (this.chargerState !== 'idle') return;
 
-    // === CHARGER: Traque le joueur agressivement ===
+    // === CHARGER: TOURNE AUTOUR DU JOUEUR COMME UN PRÉDATEUR ===
+    // Mouvement circulaire agressif - occupe toute l'arène!
 
     const toPlayerX = this.player.x - this.boss.x;
     const toPlayerY = this.player.y - this.boss.y;
     const distToPlayer = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
 
-    // === COMPORTEMENT: Suivre le joueur horizontalement, rester à distance verticale ===
-    // Le boss traque le joueur sur l'axe X mais garde une certaine hauteur
-
-    // Distance idéale du joueur (pas trop près, pas trop loin)
-    const idealDist = 120 + Math.random() * 60;
-
-    // Cible: même hauteur que le sol ou légèrement au-dessus du joueur
-    let targetX, targetY;
-
-    if (distToPlayer > idealDist + 50) {
-      // Trop loin - se rapprocher du joueur
-      targetX = this.player.x + (toPlayerX > 0 ? -idealDist : idealDist);
-      targetY = this.WORLD.groundY - 80;
-    } else if (distToPlayer < idealDist - 30) {
-      // Trop près - reculer un peu
-      targetX = this.boss.x - Math.sign(toPlayerX) * 50;
-      targetY = this.WORLD.groundY - 80;
-    } else {
-      // Bonne distance - mouvement latéral pour être menaçant
-      targetX = this.boss.x + (Math.random() - 0.5) * 100;
-      targetY = this.WORLD.groundY - 80;
+    // === ORBITE AUTOUR DU JOUEUR ===
+    // Initialiser l'angle d'orbite si nécessaire
+    if (this.chargerOrbitAngle === undefined) {
+      this.chargerOrbitAngle = Math.atan2(this.boss.y - this.player.y, this.boss.x - this.player.x);
     }
 
-    // Limiter dans l'arène
-    targetX = Phaser.Math.Clamp(targetX, 80, this.WORLD.width - 80);
-    targetY = Phaser.Math.Clamp(targetY, 120, this.WORLD.groundY - 60);
+    // Vitesse d'orbite - RAPIDE et menaçant
+    const orbitSpeed = (0.8 + this.bossPhase * 0.3) * (Math.random() < 0.1 ? -1 : 1); // Parfois inverse direction
+    this.chargerOrbitAngle += orbitSpeed * 0.016; // ~60fps
 
-    // Mouvement vers la cible
+    // Rayon d'orbite - GRAND pour occuper l'arène
+    const orbitRadius = 180 + Math.sin(this.time.now * 0.001) * 40; // Rayon variable
+    const centerX = this.player.x;
+    const centerY = Math.min(this.player.y, this.WORLD.groundY - 120); // Centre autour du joueur mais pas trop bas
+
+    // Position cible sur l'orbite
+    let targetX = centerX + Math.cos(this.chargerOrbitAngle) * orbitRadius;
+    let targetY = centerY + Math.sin(this.chargerOrbitAngle) * orbitRadius * 0.6; // Orbite elliptique
+
+    // Limiter dans l'arène
+    targetX = Phaser.Math.Clamp(targetX, 60, this.WORLD.width - 60);
+    targetY = Phaser.Math.Clamp(targetY, 100, this.WORLD.groundY - 50);
+
+    // Mouvement vers la cible - RAPIDE
     const moveToX = targetX - this.boss.x;
     const moveToY = targetY - this.boss.y;
     const moveDist = Math.sqrt(moveToX * moveToX + moveToY * moveToY) || 1;
 
-    // Vitesse de mouvement - AGRESSIF
-    const moveSpeed = 100 + this.bossPhase * 30;
-    if (moveDist > 15) {
-      this.setBossTargetVelocity(
-        (moveToX / moveDist) * moveSpeed,
-        (moveToY / moveDist) * moveSpeed * 0.5
-      );
-    } else {
-      // Légère dérive même à l'arrêt
-      this.setBossTargetVelocity(
-        (Math.random() - 0.5) * 30,
-        0
-      );
-    }
+    // Vitesse de mouvement - TRÈS RAPIDE pour un mouvement fluide
+    const moveSpeed = 200 + this.bossPhase * 50;
+    this.setBossTargetVelocity(
+      (moveToX / moveDist) * moveSpeed,
+      (moveToY / moveDist) * moveSpeed
+    );
 
     // Animation de respiration/pulsation menaçante
     if (!this.chargerBreathingTween || !this.chargerBreathingTween.isPlaying()) {
@@ -6239,70 +6229,68 @@ class GameScene extends Phaser.Scene {
     // === SFX DE CHARGE DÉVASTATRICE ===
     this.playSound('bossDash');
 
-    // === CHARGE TRAVERSE TOUT! ===
-    // Désactiver les collisions avec les murs pendant la charge
+    // === CHARGE TRAVERSE TOUTE L'ARÈNE! ===
     this.boss.body.setCollideWorldBounds(false);
 
-    // === CHARGE! - Vélocité directe (bypass le système de physics smoothing) ===
-    const chargeSpeed = 500 + (this.bossPhase - 1) * 100;
+    // Vitesse de charge - TRÈS RAPIDE pour traverser l'arène
+    const chargeSpeed = 650 + (this.bossPhase - 1) * 100;
 
-    // Définir la vélocité de charge directement ET la target pour que le système ne freine pas
-    this.boss.body.setVelocity(dirX * chargeSpeed, dirY * chargeSpeed * 0.2);
-    this.boss.targetVelX = dirX * chargeSpeed;
-    this.boss.targetVelY = dirY * chargeSpeed * 0.2;
+    // Direction principalement horizontale vers le joueur
+    const chargeVelX = dirX * chargeSpeed;
+    const chargeVelY = dirY * chargeSpeed * 0.15; // Très peu de mouvement vertical
 
-    // Effet visuel de lunge
+    // Appliquer la vélocité directement ET sur la target
+    this.boss.body.setVelocity(chargeVelX, chargeVelY);
+    this.boss.targetVelX = chargeVelX;
+    this.boss.targetVelY = chargeVelY;
+
+    // Calculer le temps pour traverser l'arène (distance / vitesse)
+    const distanceToWall = dirX > 0
+      ? (this.WORLD.width - 60 - this.boss.x)
+      : (this.boss.x - 60);
+    const chargeDuration = Math.max(600, (distanceToWall / chargeSpeed) * 1000 + 200);
+
+    // Screen shake FORT pendant la charge
+    this.cameras.main.shake(chargeDuration, 0.025);
+
+    // Effet visuel d'étirement
     this.tweens.add({
       targets: this.boss,
-      scaleX: 1.4,
-      scaleY: 0.7,
+      scaleX: 1.5,
+      scaleY: 0.6,
       duration: 100,
-      yoyo: true,
       ease: 'Quad.easeOut'
     });
 
-    // Screen shake pendant la charge
-    this.cameras.main.shake(400, 0.02);
-
-    // Animation d'étirement pendant la charge
-    this.tweens.add({
-      targets: this.boss,
-      scaleX: 1.4,
-      scaleY: 0.7,
-      duration: 150,
-      yoyo: true,
-      repeat: 2
-    });
-
-    // Traînée de particules INTENSE pendant la charge
-    for (let i = 0; i < 12; i++) {
-      this.time.delayedCall(i * 40, () => {
+    // Traînée de particules INTENSE pendant toute la charge
+    const particleCount = Math.ceil(chargeDuration / 50);
+    for (let i = 0; i < particleCount; i++) {
+      this.time.delayedCall(i * 50, () => {
         if (this.boss && this.boss.active && this.chargerState === 'charging') {
           // Particules de feu/rage
           this.emitParticles(this.boss.x, this.boss.y, {
-            count: 6,
+            count: 5,
             colors: [0xff4400, 0xff0000, 0xffaa00, 0xffff00],
-            minSpeed: 40,
-            maxSpeed: 100,
-            minSize: 5,
-            maxSize: 14,
-            life: 300,
-            spread: Math.PI * 0.8,
-            angle: Math.atan2(-dirY, -dirX),
-            fadeOut: true,
-            shape: 'star'
+            minSpeed: 60,
+            maxSpeed: 140,
+            minSize: 6,
+            maxSize: 16,
+            life: 350,
+            spread: Math.PI * 0.6,
+            angle: Math.atan2(-chargeVelY, -chargeVelX),
+            fadeOut: true
           });
 
           // Traînée de poussière au sol
-          if (this.boss.y > this.WORLD.groundY - 100) {
+          if (this.boss.y > this.WORLD.groundY - 120) {
             this.emitParticles(this.boss.x, this.WORLD.groundY - 20, {
-              count: 3,
+              count: 4,
               colors: [0x886644, 0xaa8866, 0x664422],
-              minSpeed: 30,
-              maxSpeed: 70,
-              minSize: 4,
-              maxSize: 10,
-              life: 400,
+              minSpeed: 40,
+              maxSpeed: 90,
+              minSize: 5,
+              maxSize: 12,
+              life: 500,
               angle: -Math.PI / 2,
               spread: Math.PI / 2,
               fadeOut: true
@@ -6312,99 +6300,71 @@ class GameScene extends Phaser.Scene {
       });
     }
 
-    // === IMPACT AU MUR (si applicable) ===
-    this.time.delayedCall(500, () => {
+    // === FIN DE CHARGE - Quand atteint le mur ===
+    this.time.delayedCall(chargeDuration, () => {
       if (!this.boss || !this.boss.active) return;
+      if (this.chargerState !== 'charging') return;
 
-      // Vérifier si proche d'un mur
-      if (this.boss.x < 120 || this.boss.x > this.WORLD.width - 120) {
-        // IMPACT AU MUR - effet dévastateur
-        this.playSound('bossHit');
-        this.cameras.main.shake(300, 0.025);
+      // IMPACT AU MUR - effet dévastateur
+      this.playSound('bossHit');
+      this.cameras.main.shake(400, 0.035);
 
-        // Explosion de particules à l'impact
-        this.emitParticles(this.boss.x, this.boss.y, {
-          count: 20,
-          colors: [0xff4400, 0xffaa00, 0xffffff],
-          minSpeed: 100,
-          maxSpeed: 250,
-          minSize: 4,
-          maxSize: 12,
-          life: 400,
-          spread: Math.PI * 2,
-          fadeOut: true
-        });
-      }
-    });
+      // Explosion de particules à l'impact
+      this.emitParticles(this.boss.x, this.boss.y, {
+        count: 25,
+        colors: [0xff4400, 0xffaa00, 0xffffff],
+        minSpeed: 120,
+        maxSpeed: 300,
+        minSize: 5,
+        maxSize: 15,
+        life: 500,
+        spread: Math.PI * 2,
+        fadeOut: true
+      });
 
-    // === RECOVERY WINDOW (OPENING) ===
-    this.time.delayedCall(650, () => {
-      if (!this.boss || !this.boss.active) return;
-
+      // Arrêter le boss
       this.chargerState = 'recovering';
       this.chargerLastStateChange = this.time.now;
       this.setBossTargetVelocity(0, 0);
       this.boss.body.setVelocity(0, 0);
-
-      // Réactiver les collisions avec les bords
       this.boss.body.setCollideWorldBounds(true);
 
-      // Si le boss est sorti de l'arène, le téléporter de l'autre côté (effet wrap-around)
-      if (this.boss.x < 50) {
-        // Sorti à gauche -> réapparaît à droite
-        this.boss.x = this.WORLD.width - 100;
-        this.emitParticles(this.boss.x, this.boss.y, {
-          count: 15,
-          colors: [0xff4400, 0xff0000, 0xffaa00],
-          minSpeed: 80,
-          maxSpeed: 180,
-          minSize: 5,
-          maxSize: 12,
-          life: 400,
-          spread: Math.PI * 2,
-          fadeOut: true
-        });
-      } else if (this.boss.x > this.WORLD.width - 50) {
-        // Sorti à droite -> réapparaît à gauche
-        this.boss.x = 100;
-        this.emitParticles(this.boss.x, this.boss.y, {
-          count: 15,
-          colors: [0xff4400, 0xff0000, 0xffaa00],
-          minSpeed: 80,
-          maxSpeed: 180,
-          minSize: 5,
-          maxSize: 12,
-          life: 400,
-          spread: Math.PI * 2,
-          fadeOut: true
-        });
-      }
-
-      // Garder le boss dans les limites Y
-      this.boss.y = Phaser.Math.Clamp(this.boss.y, 100, this.WORLD.groundY - 80);
+      // Garder le boss dans l'arène
+      this.boss.x = Phaser.Math.Clamp(this.boss.x, 80, this.WORLD.width - 80);
+      this.boss.y = Phaser.Math.Clamp(this.boss.y, 100, this.WORLD.groundY - 60);
 
       // SFX de récupération (essoufflement)
       this.playSound('bossHurtCry');
 
-      // Animation de récupération (boss vulnérable)
+      // Animation de récupération - boss étourdi après l'impact
       this.tweens.add({
         targets: this.boss,
-        scaleX: 1.2,
-        scaleY: 0.8,
-        duration: 300,
+        scaleX: 1.3,
+        scaleY: 0.7,
+        duration: 200,
         yoyo: true,
-        repeat: 1
+        repeat: 2,
+        onComplete: () => {
+          if (this.boss && this.boss.active) {
+            this.tweens.add({
+              targets: this.boss,
+              scaleX: 1,
+              scaleY: 1,
+              duration: 200
+            });
+          }
+        }
       });
 
-      // Particules de fatigue/vapeur
-      this.emitParticles(this.boss.x, this.boss.y - 20, {
-        count: 8,
+      // Particules de fatigue/étourdissement
+      this.emitParticles(this.boss.x, this.boss.y - 30, {
+        count: 10,
         colors: [0xffff00, 0xffffff, 0xaaaaaa],
-        minSpeed: 15,
-        maxSpeed: 40,
-        minSize: 3,
-        maxSize: 6,
-        life: 600,
+        minSpeed: 20,
+        maxSpeed: 50,
+        minSize: 4,
+        maxSize: 8,
+        life: 700,
         angle: -Math.PI / 2,
         spread: Math.PI / 2,
         fadeOut: true
@@ -6416,25 +6376,25 @@ class GameScene extends Phaser.Scene {
       const maxCombo = this.chargerMaxCombo || (2 + this.bossPhase);
 
       // Probabilité de continuer le combo (diminue avec chaque charge)
-      const continueChance = Math.max(0.3, 0.7 - this.chargerComboCount * 0.15);
+      const continueChance = Math.max(0.2, 0.6 - this.chargerComboCount * 0.2);
 
       if (this.chargerComboCount < maxCombo && Math.random() < continueChance) {
         // === ENCHAÎNE UNE AUTRE CHARGE! ===
-        this.time.delayedCall(400, () => {
+        this.time.delayedCall(600, () => {
           if (this.boss && this.boss.active) {
             // Grognement de rage - il est lancé!
             this.playSound('bossWarning');
             this.chargerState = 'idle';
             // Déclenche immédiatement une autre charge
-            this.time.delayedCall(100, () => {
+            this.time.delayedCall(200, () => {
               this.bossChargerWindUp();
             });
           }
         });
       } else {
-        // Fin du combo - vraie recovery
+        // Fin du combo - vraie recovery (fenêtre de punition)
         this.chargerComboCount = 0;
-        this.time.delayedCall(800, () => {
+        this.time.delayedCall(1200, () => {
           if (this.boss && this.boss.active) {
             this.chargerState = 'idle';
             this.tweens.add({
@@ -10654,20 +10614,48 @@ class GameScene extends Phaser.Scene {
       this.isClimbing = false;
     }
 
+    // === CROUCH (SE BAISSER) ===
+    const wasCrouching = this.isCrouching;
+    if (down && onGround && !this.isDashing && !this.isClimbing) {
+      // Se baisser
+      if (!this.isCrouching) {
+        this.isCrouching = true;
+        // Réduire la hitbox (hauteur divisée par 2)
+        body.setSize(14, 13);
+        body.setOffset(1, 14); // Décaler vers le bas pour rester au sol
+        // Effet visuel de squash
+        this.playerScaleX = 1.3;
+        this.playerScaleY = 0.5;
+      }
+    } else {
+      // Se relever
+      if (this.isCrouching) {
+        this.isCrouching = false;
+        // Restaurer la hitbox normale
+        body.setSize(14, 26);
+        body.setOffset(1, 1);
+        // Effet visuel de stretch au relevé
+        this.playerScaleX = 0.8;
+        this.playerScaleY = 1.2;
+      }
+    }
+
     // === MOUVEMENT HORIZONTAL ===
     if (!this.isDashing) {
       const currentVelX = body.velocity.x;
       const inAir = !onGround;
       const accel = inAir ? cfg.airAccel : cfg.playerAccel;
       const decel = inAir ? cfg.airDecel : cfg.playerDecel;
+      // Vitesse réduite quand accroupi
+      const maxSpeed = this.isCrouching ? cfg.playerSpeed * 0.4 : cfg.playerSpeed;
 
       if (this.wallJumpLockTimer > 0) {
         this.wallJumpLockTimer -= delta;
       } else {
         if (left) {
-          body.setVelocityX(Math.max(currentVelX - accel * delta / 1000, -cfg.playerSpeed));
+          body.setVelocityX(Math.max(currentVelX - accel * delta / 1000, -maxSpeed));
         } else if (right) {
-          body.setVelocityX(Math.min(currentVelX + accel * delta / 1000, cfg.playerSpeed));
+          body.setVelocityX(Math.min(currentVelX + accel * delta / 1000, maxSpeed));
         } else {
           // Friction
           if (currentVelX > 0) {
