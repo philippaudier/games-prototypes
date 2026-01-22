@@ -13,6 +13,9 @@ class GameScene extends Phaser.Scene {
     this.maxHealth = data.maxHealth || 3; // Nombre de coeurs max
     // HP en quarts: 4 HP = 1 coeur plein
     this.currentHealth = data.currentHealth !== undefined ? data.currentHealth : this.maxHealth * 4;
+    // Shield: armure qui protège les vrais HP (en quarts aussi, 4 = 1 bouclier)
+    this.currentShield = data.currentShield || 0;
+    this.maxShield = 3; // Max 3 boucliers affichables
     this.isTransitioning = false; // Flag pour éviter les transitions multiples
 
     // Charger les meilleurs temps depuis localStorage
@@ -38,6 +41,8 @@ class GameScene extends Phaser.Scene {
     this.load.image('heart_3', 'assets/heart_3.png');
     this.load.image('heart_demi', 'assets/heart_demi.png');
     this.load.image('heart_1', 'assets/heart_1.png');
+    // Shield
+    this.load.image('shield', 'assets/shield.png');
   }
 
   create() {
@@ -94,6 +99,7 @@ class GameScene extends Phaser.Scene {
     this.coyoteTimer = 0;
     this.jumpBufferTimer = 0;
     this.playerHealth = this.currentHealth; // HP en quarts (4 HP = 1 coeur)
+    this.playerShield = this.currentShield; // Bouclier en quarts (4 = 1 bouclier)
     this.isInvincible = true; // Invincible au spawn
     this.canMove = false; // Freeze au spawn
     this.hasKey = false;
@@ -2404,6 +2410,10 @@ class GameScene extends Phaser.Scene {
     this.healthContainer = this.add.container(centerX, padding + 16).setScrollFactor(0).setDepth(uiDepth + 1);
     this.updateHealthDisplay();
 
+    // Shield - affichage sous les coeurs
+    this.shieldContainer = this.add.container(centerX, padding + 42).setScrollFactor(0).setDepth(uiDepth + 1);
+    this.updateShieldDisplay();
+
     // === ZONE DROITE : Timers ===
     const rightX = vw - padding;
     const rightPanel = this.add.rectangle(rightX, padding, 80, 44, 0x000000, 0.6)
@@ -2741,6 +2751,97 @@ class GameScene extends Phaser.Scene {
       }
 
       this.healthContainer.add(heart);
+    }
+  }
+
+  updateShieldDisplay() {
+    // Ne pas afficher si pas de shield
+    if (!this.shieldContainer) return;
+
+    const oldShield = this.previousShield || this.playerShield;
+    this.previousShield = this.playerShield;
+    const shieldChanged = oldShield !== this.playerShield;
+    const shieldDamaged = this.playerShield < oldShield;
+    const shieldGained = this.playerShield > oldShield;
+
+    this.shieldContainer.removeAll(true);
+
+    // Calculer le nombre de boucliers à afficher
+    const shieldCount = Math.ceil(this.playerShield / 4);
+    if (shieldCount === 0) return; // Pas de shield = pas d'affichage
+
+    const spacing = 28; // Plus petit que les coeurs
+    const totalWidth = shieldCount * spacing;
+    const startX = -totalWidth / 2 + spacing / 2;
+
+    for (let i = 0; i < shieldCount; i++) {
+      // Calculer combien de HP ce bouclier contient (0-4)
+      const shieldHp = Math.max(0, Math.min(4, this.playerShield - i * 4));
+
+      const shield = this.add.sprite(startX + i * spacing, 0, 'shield');
+      shield.setScale(1.5);
+      shield.setOrigin(0.5);
+
+      // Opacité selon le remplissage
+      if (shieldHp < 4) {
+        shield.setAlpha(0.3 + (shieldHp / 4) * 0.7);
+      }
+
+      // Teinte cyan/bleu pour les boucliers
+      shield.setTint(0x44ccff);
+
+      // Animation de pulsation pour les boucliers pleins
+      if (shieldHp >= 4) {
+        this.tweens.add({
+          targets: shield,
+          scale: 1.7,
+          duration: 600 + i * 100,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+      }
+
+      // Animation de transition
+      if (shieldChanged) {
+        const oldShieldHp = Math.max(0, Math.min(4, oldShield - i * 4));
+        const thisShieldChanged = oldShieldHp !== shieldHp;
+
+        if (thisShieldChanged) {
+          if (shieldDamaged && shieldHp < oldShieldHp) {
+            // Animation de dégâts - shake et flash blanc
+            shield.setTint(0xffffff);
+            this.tweens.add({
+              targets: shield,
+              x: shield.x + 2,
+              duration: 25,
+              yoyo: true,
+              repeat: 4,
+              onComplete: () => {
+                shield.setTint(0x44ccff);
+                if (shieldHp === 0) {
+                  shield.setAlpha(0.3);
+                }
+              }
+            });
+          } else if (shieldGained && shieldHp > oldShieldHp) {
+            // Animation de gain - scale up avec flash
+            shield.setTint(0x88ffff);
+            shield.setScale(0.5);
+            this.tweens.add({
+              targets: shield,
+              scale: 1.5,
+              duration: 200,
+              ease: 'Back.easeOut',
+              onComplete: () => {
+                shield.setTint(0x44ccff);
+              }
+            });
+          }
+        }
+      }
+
+      this.shieldContainer.add(shield);
     }
   }
 
@@ -3312,6 +3413,50 @@ class GameScene extends Phaser.Scene {
           targets: this.heartPickup,
           y: heartPlat.y - 35,
           duration: 800,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+      }
+    }
+
+    // === SHIELD PICKUP (même rareté que le coeur) ===
+    const shieldChance = Math.min(0.15 + this.currentLevel * 0.03, 0.4); // Même chance que coeur
+    if (Math.random() < shieldChance) {
+      // Placer sur une plateforme différente du coeur si possible
+      const validShieldPlatforms = platformData.filter(p => {
+        const distToDoor = Math.abs(p.x - doorX) + Math.abs(p.y - doorY);
+        const distToKey = Math.abs(p.x - keyX) + Math.abs(p.y - keyY);
+        // Éviter aussi la plateforme du coeur
+        const distToHeart = this.heartPickup ? Math.abs(p.x - this.heartPickup.x) + Math.abs(p.y - (this.heartPickup.y + 25)) : 100;
+        return distToDoor > 60 && distToKey > 60 && distToHeart > 40;
+      });
+      const shieldPlat = validShieldPlatforms.length > 0
+        ? validShieldPlatforms[this.rng.between(0, validShieldPlatforms.length - 1)]
+        : null;
+
+      if (shieldPlat) {
+        this.shieldPickup = this.add.sprite(shieldPlat.x, shieldPlat.y - 25, 'shield');
+        this.shieldPickup.setScale(2);
+        this.shieldPickup.setOrigin(0.5);
+        this.shieldPickup.setTint(0x44ccff); // Teinte cyan
+        this.physics.add.existing(this.shieldPickup, true);
+        this.shieldPickup.body.setSize(16, 16);
+        this.physics.add.overlap(this.player, this.shieldPickup, this.collectShield, null, this);
+
+        // Animation de flottement + rotation lente
+        this.tweens.add({
+          targets: this.shieldPickup,
+          y: shieldPlat.y - 35,
+          duration: 900,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+        this.tweens.add({
+          targets: this.shieldPickup,
+          angle: 10,
+          duration: 1200,
           yoyo: true,
           repeat: -1,
           ease: 'Sine.easeInOut'
@@ -10405,7 +10550,8 @@ class GameScene extends Phaser.Scene {
       score: this.score,
       totalTime: this.totalTime + this.levelTime,
       maxHealth: this.maxHealth,
-      currentHealth: this.playerHealth
+      currentHealth: this.playerHealth,
+      currentShield: this.playerShield
     });
   }
 
@@ -10454,6 +10600,47 @@ class GameScene extends Phaser.Scene {
   takeDamage(amount = 4) {
     // amount: 4 = 1 coeur, 2 = demi-coeur, 6 = 1.5 coeurs, 8 = 2 coeurs
     if (this.isInvincible) return;
+
+    // Shield absorbe les dégâts en premier
+    if (this.playerShield > 0) {
+      const shieldDamage = Math.min(this.playerShield, amount);
+      this.playerShield -= shieldDamage;
+      amount -= shieldDamage;
+      this.updateShieldDisplay();
+
+      // Effet visuel cyan pour les dégâts au shield
+      if (shieldDamage > 0) {
+        this.emitParticles(this.player.x, this.player.y, {
+          count: 8,
+          colors: [0x44ccff, 0x88ddff],
+          minSpeed: 60,
+          maxSpeed: 120,
+          minSize: 3,
+          maxSize: 7,
+          life: 300,
+          spread: Math.PI * 2,
+          fadeOut: true
+        });
+      }
+
+      // Si le shield a tout absorbé
+      if (amount <= 0) {
+        this.playSound('coin'); // Son différent pour shield hit
+        this.isInvincible = true;
+        this.tweens.add({
+          targets: this.player,
+          alpha: 0.5,
+          duration: 80,
+          yoyo: true,
+          repeat: 2,
+          onComplete: () => {
+            this.isInvincible = false;
+            this.player.alpha = 1;
+          }
+        });
+        return;
+      }
+    }
 
     this.playerHealth -= amount;
     this.updateHealthDisplay();
@@ -10548,6 +10735,58 @@ class GameScene extends Phaser.Scene {
     });
 
     this.score += 100;
+    this.scoreText.setText(this.score.toString().padStart(6, '0'));
+  }
+
+  collectShield() {
+    if (!this.shieldPickup || !this.shieldPickup.active) return;
+
+    // SFX (réutilise le son de coin pour l'instant)
+    this.playSound('coin');
+
+    // Particules cyan
+    this.emitParticles(this.shieldPickup.x, this.shieldPickup.y, {
+      count: 15,
+      colors: [0x44ccff, 0x88ddff, 0xaaeeff],
+      minSpeed: 80,
+      maxSpeed: 180,
+      minSize: 4,
+      maxSize: 10,
+      life: 400,
+      spread: Math.PI * 2,
+      fadeOut: true
+    });
+
+    this.shieldPickup.destroy();
+
+    // Ajoute un bouclier complet (4 HP de shield)
+    this.playerShield = Math.min(this.playerShield + 4, this.maxShield * 4);
+    this.updateShieldDisplay();
+
+    // Effet visuel
+    const bonusText = this.add.text(this.player.x, this.player.y - 40, '+1 SHIELD!', {
+      fontSize: '16px',
+      fill: '#44ccff',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+
+    this.tweens.add({
+      targets: bonusText,
+      y: bonusText.y - 50,
+      alpha: 0,
+      duration: 1000,
+      onComplete: () => bonusText.destroy()
+    });
+
+    // Flash cyan sur le joueur
+    this.player.setTint(0x44ccff);
+    this.time.delayedCall(200, () => {
+      if (this.player && this.player.active) {
+        this.player.clearTint();
+      }
+    });
+
+    this.score += 50;
     this.scoreText.setText(this.score.toString().padStart(6, '0'));
   }
 
