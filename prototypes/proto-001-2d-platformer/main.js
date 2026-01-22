@@ -513,21 +513,26 @@ class GameScene extends Phaser.Scene {
     // Activer l'audio au premier input utilisateur
     const enableAudio = () => {
       if (!this.audioCtx) {
-        this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        this.audioEnabled = true;
-        // Si une musique de boss était en attente, la lancer maintenant
-        if (this.pendingBossMusic !== null) {
-          this.startBossMusic(this.pendingBossMusic);
-          this.pendingBossMusic = null;
-        }
-        // Si une musique de niveau était en attente
-        if (this.pendingMusic) {
-          this.playMusicTrack(this.pendingMusic);
-          this.pendingMusic = null;
+        try {
+          this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          this.audioEnabled = true;
+          // Si une musique de boss était en attente, la lancer maintenant
+          if (this.pendingBossMusic !== null) {
+            this.startBossMusic(this.pendingBossMusic);
+            this.pendingBossMusic = null;
+          }
+          // Si une musique de niveau était en attente
+          if (this.pendingMusic) {
+            this.playMusicTrack(this.pendingMusic);
+            this.pendingMusic = null;
+          }
+        } catch (e) {
+          console.warn('AudioContext creation failed:', e);
         }
       }
-      if (this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume();
+      // IMPORTANT pour mobile: toujours essayer de resume
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume().catch(() => {});
       }
       // Essayer de jouer la musique en attente (HTML5 Audio)
       if (this.currentTrack && this.currentTrack.paused && this.musicPlaying) {
@@ -535,12 +540,29 @@ class GameScene extends Phaser.Scene {
       }
     };
 
+    // Événements Phaser
     this.input.on('pointerdown', enableAudio, this);
+    this.input.on('pointerup', enableAudio, this);
     this.input.keyboard.on('keydown', enableAudio, this);
+
+    // Événements DOM natifs pour mobile (plus fiables)
+    const canvas = this.game.canvas;
+    canvas.addEventListener('touchstart', enableAudio, { passive: true });
+    canvas.addEventListener('touchend', enableAudio, { passive: true });
+    canvas.addEventListener('click', enableAudio, { passive: true });
+
+    // Essayer d'activer immédiatement si possible
+    enableAudio();
   }
 
   playSound(type, options = {}) {
     if (!this.audioCtx || !this.audioEnabled) return;
+
+    // Sur mobile, l'AudioContext peut être suspendu - essayer de le reprendre
+    if (this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume().catch(() => {});
+      return; // Le son sera perdu mais les suivants marcheront
+    }
 
     const ctx = this.audioCtx;
     const now = ctx.currentTime;
