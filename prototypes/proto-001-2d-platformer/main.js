@@ -5912,25 +5912,35 @@ class GameScene extends Phaser.Scene {
   }
 
   // ==========================================
-  // BOSS 1 : CHARGER - Dash + Tirs en éventail
+  // BOSS 1 : CHARGER - Système de Movesets
   // ==========================================
   initBossCharger() {
-    // === CHARGER: LE TAUREAU LÉGENDAIRE ===
-    // Premier boss - doit incarner son NOM: IL CHARGE!
-    // - CHARGE est son attaque PRINCIPALE (très fréquente!)
-    // - Combos de charges enchaînées
-    // - Tirs seulement pour punir les joueurs distants
-    // - Recovery windows courts entre les charges
+    // === CHARGER: LE TAUREAU - MOVESET COMPLET ===
+    // Movesets disponibles:
+    // - DASH: Dash rapide vers le joueur
+    // - DASH_COMBO: 2-3 dashes enchaînés
+    // - FAN_SHOT: Tir en éventail
+    // - STOMP: Frappe au sol avec onde de choc
+    // - HORN_TOSS: Coup de corne si joueur proche
 
-    this.chargerState = 'idle'; // idle, winding, charging, recovering, shooting, evading
-    this.chargerComboCount = 0;
-    this.chargerMaxCombo = 2 + this.bossPhase; // Combos de charges!
+    this.chargerState = 'idle';
     this.chargerLastStateChange = 0;
+    this.chargerCurrentMove = null;
+    this.chargerDashCount = 0;
+
+    // Cooldowns par attaque (évite spam de la même attaque)
+    this.chargerCooldowns = {
+      dash: 0,
+      dashCombo: 0,
+      fanShot: 0,
+      stomp: 0,
+      hornToss: 0
+    };
 
     // Commence mobile
     this.setBossTargetVelocity(0, 0);
 
-    // Timer de mouvement - TRÈS fréquent pour être réactif
+    // Timer de mouvement - orbite autour du joueur
     this.bossMoveTimer = this.time.addEvent({
       delay: 100,
       callback: this.bossChargerMove,
@@ -5938,54 +5948,35 @@ class GameScene extends Phaser.Scene {
       loop: true
     });
 
-    // Tir en éventail - RARE (CHARGER préfère charger!)
-    const shootDelay = 3000 + Math.random() * 1500;
-    this.bossShootTimer = this.time.addEvent({
-      delay: shootDelay,
+    // Timer d'attaque principal - choisit un moveset
+    this.chargerAttackTimer = this.time.addEvent({
+      delay: 1500 + Math.random() * 500,
       callback: () => {
-        this.bossChargerShoot();
-        // Délai LONG entre les tirs - ce n'est pas son style!
-        this.bossShootTimer.delay = 2500 + Math.random() * 2000;
+        this.bossChargerChooseAttack();
+        // Délai variable entre les attaques
+        const baseDelay = Math.max(1200, 2000 - this.bossPhase * 200);
+        this.chargerAttackTimer.delay = baseDelay + Math.random() * 800;
       },
       callbackScope: this,
       loop: true
     });
 
-    // === CHARGE! C'EST SON IDENTITÉ! ===
-    // Charges puissantes qui traversent toute l'arène
-    const chargeDelay = 2500 + Math.random() * 1000;
-    this.chargerChargeTimer = this.time.addEvent({
-      delay: chargeDelay,
-      callback: () => {
-        this.bossChargerWindUp();
-        // Délai raisonnable entre les grosses charges
-        // Plus agressif en phases avancées
-        const baseDelay = Math.max(1800, 3000 - this.bossPhase * 300);
-        this.chargerChargeTimer.delay = baseDelay + Math.random() * 1000;
-      },
-      callbackScope: this,
-      loop: true
-    });
-
-    // Rugissement - intimide et annonce une série de charges
-    this.chargerRoarTimer = this.time.addEvent({
-      delay: 5000 + Math.random() * 3000,
-      callback: () => {
-        this.bossChargerRoar();
-        this.chargerRoarTimer.delay = 6000 + Math.random() * 4000;
-      },
-      callbackScope: this,
-      loop: true
-    });
-
-    // Safety: reset état si bloqué trop longtemps
+    // Safety: reset état si bloqué
     this.time.addEvent({
       delay: 500,
       callback: () => {
         if (!this.boss || !this.boss.active) return;
-        if (this.chargerState !== 'idle' &&
-            this.time.now - this.chargerLastStateChange > 3000) {
+        // Décrémenter les cooldowns
+        const now = this.time.now;
+        for (let key in this.chargerCooldowns) {
+          if (this.chargerCooldowns[key] > 0) {
+            this.chargerCooldowns[key] = Math.max(0, this.chargerCooldowns[key] - 500);
+          }
+        }
+        // Reset si bloqué
+        if (this.chargerState !== 'idle' && now - this.chargerLastStateChange > 4000) {
           this.chargerState = 'idle';
+          this.chargerCurrentMove = null;
         }
       },
       callbackScope: this,
@@ -5993,534 +5984,551 @@ class GameScene extends Phaser.Scene {
     });
   }
 
-  bossChargerRoar() {
+  // === CHOIX D'ATTAQUE INTELLIGENT ===
+  bossChargerChooseAttack() {
     if (!this.boss || !this.boss.active) return;
     if (this.chargerState !== 'idle') return;
-
-    // Animation de rugissement
-    this.tweens.add({
-      targets: this.boss,
-      scaleX: 1.15,
-      scaleY: 0.9,
-      duration: 200,
-      yoyo: true,
-      repeat: 2
-    });
-
-    // SFX de rugissement intimidant
-    this.playSound('bossRoar');
-
-    // Particules de rage
-    for (let i = 0; i < 8; i++) {
-      const angle = (i / 8) * Math.PI * 2;
-      this.emitParticles(this.boss.x + Math.cos(angle) * 40, this.boss.y + Math.sin(angle) * 40, {
-        count: 2,
-        colors: [0xff4400, 0xff0000, 0xff6600],
-        minSpeed: 30,
-        maxSpeed: 60,
-        minSize: 3,
-        maxSize: 7,
-        life: 400,
-        angle: angle,
-        spread: 0.5,
-        fadeOut: true
-      });
-    }
-
-    // Screen shake léger
-    this.cameras.main.shake(200, 0.005);
-  }
-
-  bossChargerMove() {
-    if (!this.boss || !this.boss.active) return;
-    if (this.chargerState !== 'idle') return;
-
-    // === CHARGER: TOURNE AUTOUR DU JOUEUR COMME UN PRÉDATEUR ===
-    // Mouvement circulaire agressif - occupe toute l'arène!
 
     const toPlayerX = this.player.x - this.boss.x;
     const toPlayerY = this.player.y - this.boss.y;
-    const distToPlayer = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
+    const dist = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY);
+    const playerAbove = this.player.y < this.boss.y - 50;
 
-    // === ORBITE AUTOUR DU JOUEUR ===
-    // Initialiser l'angle d'orbite si nécessaire
-    if (this.chargerOrbitAngle === undefined) {
-      this.chargerOrbitAngle = Math.atan2(this.boss.y - this.player.y, this.boss.x - this.player.x);
+    // Liste des attaques disponibles (non en cooldown)
+    const availableAttacks = [];
+
+    // DASH - toujours disponible, préféré à moyenne distance
+    if (this.chargerCooldowns.dash <= 0) {
+      const weight = dist > 150 && dist < 400 ? 3 : 1;
+      for (let i = 0; i < weight; i++) availableAttacks.push('dash');
     }
 
-    // Vitesse d'orbite - RAPIDE et menaçant
-    const orbitSpeed = (0.8 + this.bossPhase * 0.3) * (Math.random() < 0.1 ? -1 : 1); // Parfois inverse direction
-    this.chargerOrbitAngle += orbitSpeed * 0.016; // ~60fps
-
-    // Rayon d'orbite - GRAND pour occuper l'arène
-    const orbitRadius = 180 + Math.sin(this.time.now * 0.001) * 40; // Rayon variable
-    const centerX = this.player.x;
-    const centerY = Math.min(this.player.y, this.WORLD.groundY - 120); // Centre autour du joueur mais pas trop bas
-
-    // Position cible sur l'orbite
-    let targetX = centerX + Math.cos(this.chargerOrbitAngle) * orbitRadius;
-    let targetY = centerY + Math.sin(this.chargerOrbitAngle) * orbitRadius * 0.6; // Orbite elliptique
-
-    // Limiter dans l'arène
-    targetX = Phaser.Math.Clamp(targetX, 60, this.WORLD.width - 60);
-    targetY = Phaser.Math.Clamp(targetY, 100, this.WORLD.groundY - 50);
-
-    // Mouvement vers la cible - RAPIDE
-    const moveToX = targetX - this.boss.x;
-    const moveToY = targetY - this.boss.y;
-    const moveDist = Math.sqrt(moveToX * moveToX + moveToY * moveToY) || 1;
-
-    // Vitesse de mouvement - TRÈS RAPIDE pour un mouvement fluide
-    const moveSpeed = 200 + this.bossPhase * 50;
-    this.setBossTargetVelocity(
-      (moveToX / moveDist) * moveSpeed,
-      (moveToY / moveDist) * moveSpeed
-    );
-
-    // Animation de respiration/pulsation menaçante
-    if (!this.chargerBreathingTween || !this.chargerBreathingTween.isPlaying()) {
-      this.chargerBreathingTween = this.tweens.add({
-        targets: this.boss,
-        scaleX: { from: 1, to: 1.05 },
-        scaleY: { from: 1, to: 0.97 },
-        duration: 500,
-        yoyo: true,
-        repeat: 0,
-        ease: 'Sine.easeInOut'
-      });
+    // DASH_COMBO - préféré si joueur loin
+    if (this.chargerCooldowns.dashCombo <= 0) {
+      const weight = dist > 300 ? 3 : 1;
+      for (let i = 0; i < weight; i++) availableAttacks.push('dashCombo');
     }
 
-    // Particules de fumée des naseaux
-    if (Math.random() < 0.1) {
-      const facing = Math.sign(toPlayerX) || 1;
-      const noseX = this.boss.x + facing * 25;
-      this.emitParticles(noseX, this.boss.y + 5, {
-        count: 2,
-        colors: [0x333333, 0x555555, 0xff4400],
-        minSpeed: 15,
-        maxSpeed: 35,
-        minSize: 3,
-        maxSize: 6,
-        life: 350,
-        angle: facing > 0 ? 0 : Math.PI,
-        spread: 0.5,
-        fadeOut: true
-      });
+    // FAN_SHOT - préféré à distance
+    if (this.chargerCooldowns.fanShot <= 0) {
+      const weight = dist > 200 ? 2 : 1;
+      for (let i = 0; i < weight; i++) availableAttacks.push('fanShot');
     }
 
-    // === ESQUIVE DÉFENSIVE: Si joueur au-dessus et proche ===
-    const playerAbove = this.player.y < this.boss.y - 20;
-    const playerDescending = this.player.body.velocity.y > 50;
-    const playerClose = distToPlayer < 180; // Détection plus large
+    // STOMP - préféré si joueur au-dessus ou proche
+    if (this.chargerCooldowns.stomp <= 0) {
+      const weight = playerAbove || dist < 150 ? 3 : 1;
+      for (let i = 0; i < weight; i++) availableAttacks.push('stomp');
+    }
 
-    if (playerAbove && playerClose && playerDescending && !this.bossDashCooldown) {
-      const escapeDir = toPlayerX !== 0 ? -Math.sign(toPlayerX) : (Math.random() < 0.5 ? -1 : 1);
+    // HORN_TOSS - seulement si joueur très proche
+    if (this.chargerCooldowns.hornToss <= 0 && dist < 120) {
+      availableAttacks.push('hornToss');
+      availableAttacks.push('hornToss'); // Double weight
+    }
 
-      this.chargerState = 'evading';
-      this.chargerLastStateChange = this.time.now;
+    if (availableAttacks.length === 0) return;
 
-      // Grognement d'agacement
-      this.playSound('bossHurtCry');
+    // Choisir une attaque aléatoire
+    const chosen = availableAttacks[Math.floor(Math.random() * availableAttacks.length)];
+    this.chargerCurrentMove = chosen;
 
-      // Animation d'esquive rapide
-      this.tweens.add({
-        targets: this.boss,
-        scaleX: 0.7,
-        scaleY: 1.2,
-        duration: 100,
-        yoyo: true
-      });
-
-      // Esquive rapide
-      this.bossLunge(escapeDir, -0.3, 450);
-      this.bossDashCooldown = true;
-
-      // === CONTRE-ATTAQUE SURPRISE après esquive ===
-      this.time.delayedCall(400, () => {
-        if (!this.boss || !this.boss.active) return;
-
-        // Tir rapide de représailles (surprise!)
-        this.playSound('bossWarning');
-        const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
-        for (let i = -1; i <= 1; i++) {
-          this.createBossBullet(this.boss.x, this.boss.y, angle + i * 0.3, 200);
-        }
-
-        // Particules de rage
-        this.emitParticles(this.boss.x, this.boss.y, {
-          count: 8,
-          colors: [0xff4400, 0xff0000],
-          minSpeed: 60,
-          maxSpeed: 120,
-          minSize: 4,
-          maxSize: 8,
-          life: 300,
-          spread: Math.PI * 2,
-          fadeOut: true
-        });
-      });
-
-      // Retour à idle après esquive + contre-attaque
-      this.time.delayedCall(600, () => {
-        this.chargerState = 'idle';
-      });
-      this.time.delayedCall(1500, () => this.bossDashCooldown = false);
+    switch (chosen) {
+      case 'dash': this.bossChargerDash(); break;
+      case 'dashCombo': this.bossChargerDashCombo(); break;
+      case 'fanShot': this.bossChargerFanShot(); break;
+      case 'stomp': this.bossChargerStomp(); break;
+      case 'hornToss': this.bossChargerHornToss(); break;
     }
   }
 
-  bossChargerWindUp() {
+  // === MOVESET 1: DASH RAPIDE ===
+  bossChargerDash() {
     if (!this.boss || !this.boss.active) return;
-    if (this.chargerState !== 'idle') return;
 
-    this.chargerState = 'winding';
+    this.chargerState = 'dashing';
     this.chargerLastStateChange = this.time.now;
-    this.setBossTargetVelocity(0, 0); // Arrêt complet
-
-    // SFX de préparation de charge
-    this.playSound('bossCharge');
-    this.playSound('bossWarning');
+    this.chargerCooldowns.dash = 1500; // Cooldown
 
     const toPlayerX = this.player.x - this.boss.x;
     const toPlayerY = this.player.y - this.boss.y;
     const dist = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
 
-    // === WIND-UP ANIMATION (CLEAR TELL) ===
-    // Le boss recule et se prépare - le joueur peut réagir
+    // Telegraph court
+    this.playSound('bossWarning');
+    this.setBossTargetVelocity(0, 0);
+
     this.tweens.add({
       targets: this.boss,
-      scaleX: 0.7,
-      scaleY: 1.3,
-      x: this.boss.x - Math.sign(toPlayerX) * 30,
-      duration: 800, // Long wind-up pour que le joueur voit
+      scaleX: 0.8,
+      scaleY: 1.2,
+      duration: 250,
       ease: 'Quad.easeIn',
-      onUpdate: () => {
-        // Particules de charge pendant le wind-up
-        if (Math.random() < 0.3) {
-          this.emitParticles(this.boss.x + Math.sign(toPlayerX) * 20, this.boss.y, {
-            count: 2,
-            colors: [0xff4400, 0xff0000],
-            minSpeed: 30,
-            maxSpeed: 60,
-            minSize: 3,
-            maxSize: 6,
-            life: 300,
-            angle: Math.atan2(toPlayerY, toPlayerX),
-            spread: 0.5,
-            fadeOut: true
-          });
-        }
-      },
       onComplete: () => {
         if (!this.boss || !this.boss.active) return;
-        this.bossChargerCharge(toPlayerX / dist, toPlayerY / dist);
+
+        // DASH!
+        this.playSound('bossDash');
+        const dashSpeed = 450 + this.bossPhase * 50;
+
+        this.boss.body.setVelocity(
+          (toPlayerX / dist) * dashSpeed,
+          (toPlayerY / dist) * dashSpeed * 0.3
+        );
+        this.boss.targetVelX = (toPlayerX / dist) * dashSpeed;
+        this.boss.targetVelY = (toPlayerY / dist) * dashSpeed * 0.3;
+
+        // Effet visuel
+        this.tweens.add({
+          targets: this.boss,
+          scaleX: 1.3,
+          scaleY: 0.7,
+          duration: 100,
+          yoyo: true
+        });
+
+        // Particules de dash
+        this.emitParticles(this.boss.x, this.boss.y, {
+          count: 8,
+          colors: [0xff4400, 0xff6600, 0xffaa00],
+          minSpeed: 50,
+          maxSpeed: 120,
+          minSize: 4,
+          maxSize: 10,
+          life: 250,
+          spread: Math.PI,
+          angle: Math.atan2(-toPlayerY, -toPlayerX),
+          fadeOut: true
+        });
+
+        this.cameras.main.shake(150, 0.01);
+
+        // Fin du dash
+        this.time.delayedCall(300, () => {
+          if (!this.boss || !this.boss.active) return;
+          this.setBossTargetVelocity(0, 0);
+          this.chargerState = 'idle';
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 150
+          });
+        });
       }
     });
-
-    // Flash d'avertissement (screen effet)
-    this.cameras.main.flash(100, 255, 100, 100, false);
   }
 
-  bossChargerCharge(dirX, dirY) {
+  // === MOVESET 2: DASH COMBO ===
+  bossChargerDashCombo() {
     if (!this.boss || !this.boss.active) return;
 
-    this.chargerState = 'charging';
+    this.chargerState = 'dashing';
     this.chargerLastStateChange = this.time.now;
+    this.chargerCooldowns.dashCombo = 4000; // Long cooldown
+    this.chargerDashCount = 0;
 
-    // === SFX DE CHARGE DÉVASTATRICE ===
-    this.playSound('bossDash');
+    const numDashes = 2 + Math.floor(this.bossPhase / 2); // 2-3 dashes
 
-    // === CHARGE TRAVERSE TOUTE L'ARÈNE! ===
-    this.boss.body.setCollideWorldBounds(false);
-
-    // Vitesse de charge - TRÈS RAPIDE pour traverser l'arène
-    const chargeSpeed = 650 + (this.bossPhase - 1) * 100;
-
-    // Direction principalement horizontale vers le joueur
-    const chargeVelX = dirX * chargeSpeed;
-    const chargeVelY = dirY * chargeSpeed * 0.15; // Très peu de mouvement vertical
-
-    // Appliquer la vélocité directement ET sur la target
-    this.boss.body.setVelocity(chargeVelX, chargeVelY);
-    this.boss.targetVelX = chargeVelX;
-    this.boss.targetVelY = chargeVelY;
-
-    // Calculer le temps pour traverser l'arène (distance / vitesse)
-    const distanceToWall = dirX > 0
-      ? (this.WORLD.width - 60 - this.boss.x)
-      : (this.boss.x - 60);
-    const chargeDuration = Math.max(600, (distanceToWall / chargeSpeed) * 1000 + 200);
-
-    // Screen shake FORT pendant la charge
-    this.cameras.main.shake(chargeDuration, 0.025);
-
-    // Effet visuel d'étirement
+    // Rugissement avant le combo
+    this.playSound('bossRoar');
     this.tweens.add({
       targets: this.boss,
-      scaleX: 1.5,
-      scaleY: 0.6,
-      duration: 100,
-      ease: 'Quad.easeOut'
+      scaleX: 1.2,
+      scaleY: 0.85,
+      duration: 300,
+      yoyo: true,
+      onComplete: () => {
+        this.bossChargerDashComboStep(numDashes);
+      }
     });
+  }
 
-    // Traînée de particules INTENSE pendant toute la charge
-    const particleCount = Math.ceil(chargeDuration / 50);
-    for (let i = 0; i < particleCount; i++) {
-      this.time.delayedCall(i * 50, () => {
-        if (this.boss && this.boss.active && this.chargerState === 'charging') {
-          // Particules de feu/rage
-          this.emitParticles(this.boss.x, this.boss.y, {
-            count: 5,
-            colors: [0xff4400, 0xff0000, 0xffaa00, 0xffff00],
-            minSpeed: 60,
-            maxSpeed: 140,
-            minSize: 6,
-            maxSize: 16,
-            life: 350,
-            spread: Math.PI * 0.6,
-            angle: Math.atan2(-chargeVelY, -chargeVelX),
-            fadeOut: true
-          });
-
-          // Traînée de poussière au sol
-          if (this.boss.y > this.WORLD.groundY - 120) {
-            this.emitParticles(this.boss.x, this.WORLD.groundY - 20, {
-              count: 4,
-              colors: [0x886644, 0xaa8866, 0x664422],
-              minSpeed: 40,
-              maxSpeed: 90,
-              minSize: 5,
-              maxSize: 12,
-              life: 500,
-              angle: -Math.PI / 2,
-              spread: Math.PI / 2,
-              fadeOut: true
-            });
-          }
-        }
-      });
+  bossChargerDashComboStep(remainingDashes) {
+    if (!this.boss || !this.boss.active || remainingDashes <= 0) {
+      this.chargerState = 'idle';
+      return;
     }
 
-    // === FIN DE CHARGE - Quand atteint le mur ===
-    this.time.delayedCall(chargeDuration, () => {
+    this.chargerDashCount++;
+    const toPlayerX = this.player.x - this.boss.x;
+    const toPlayerY = this.player.y - this.boss.y;
+    const dist = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
+
+    // Flash rapide
+    this.playSound('bossDash');
+    const dashSpeed = 500 + this.bossPhase * 40;
+
+    this.boss.body.setVelocity(
+      (toPlayerX / dist) * dashSpeed,
+      (toPlayerY / dist) * dashSpeed * 0.2
+    );
+    this.boss.targetVelX = (toPlayerX / dist) * dashSpeed;
+    this.boss.targetVelY = (toPlayerY / dist) * dashSpeed * 0.2;
+
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.4,
+      scaleY: 0.65,
+      duration: 80,
+      yoyo: true
+    });
+
+    this.emitParticles(this.boss.x, this.boss.y, {
+      count: 6,
+      colors: [0xff4400, 0xff0000],
+      minSpeed: 60,
+      maxSpeed: 140,
+      minSize: 5,
+      maxSize: 12,
+      life: 200,
+      spread: Math.PI * 0.8,
+      angle: Math.atan2(-toPlayerY, -toPlayerX),
+      fadeOut: true
+    });
+
+    this.cameras.main.shake(100, 0.015);
+
+    // Prochain dash ou fin
+    this.time.delayedCall(350, () => {
       if (!this.boss || !this.boss.active) return;
-      if (this.chargerState !== 'charging') return;
-
-      // IMPACT AU MUR - effet dévastateur
-      this.playSound('bossHit');
-      this.cameras.main.shake(400, 0.035);
-
-      // Explosion de particules à l'impact
-      this.emitParticles(this.boss.x, this.boss.y, {
-        count: 25,
-        colors: [0xff4400, 0xffaa00, 0xffffff],
-        minSpeed: 120,
-        maxSpeed: 300,
-        minSize: 5,
-        maxSize: 15,
-        life: 500,
-        spread: Math.PI * 2,
-        fadeOut: true
-      });
-
-      // Arrêter le boss
-      this.chargerState = 'recovering';
-      this.chargerLastStateChange = this.time.now;
       this.setBossTargetVelocity(0, 0);
       this.boss.body.setVelocity(0, 0);
-      this.boss.body.setCollideWorldBounds(true);
 
-      // Garder le boss dans l'arène
-      this.boss.x = Phaser.Math.Clamp(this.boss.x, 80, this.WORLD.width - 80);
-      this.boss.y = Phaser.Math.Clamp(this.boss.y, 100, this.WORLD.groundY - 60);
-
-      // SFX de récupération (essoufflement)
-      this.playSound('bossHurtCry');
-
-      // Animation de récupération - boss étourdi après l'impact
-      this.tweens.add({
-        targets: this.boss,
-        scaleX: 1.3,
-        scaleY: 0.7,
-        duration: 200,
-        yoyo: true,
-        repeat: 2,
-        onComplete: () => {
-          if (this.boss && this.boss.active) {
-            this.tweens.add({
-              targets: this.boss,
-              scaleX: 1,
-              scaleY: 1,
-              duration: 200
-            });
-          }
-        }
-      });
-
-      // Particules de fatigue/étourdissement
-      this.emitParticles(this.boss.x, this.boss.y - 30, {
-        count: 10,
-        colors: [0xffff00, 0xffffff, 0xaaaaaa],
-        minSpeed: 20,
-        maxSpeed: 50,
-        minSize: 4,
-        maxSize: 8,
-        life: 700,
-        angle: -Math.PI / 2,
-        spread: Math.PI / 2,
-        fadeOut: true
-      });
-
-      // === COMBO DE CHARGES ===
-      // CHARGER peut enchaîner plusieurs charges d'affilée!
-      this.chargerComboCount = (this.chargerComboCount || 0) + 1;
-      const maxCombo = this.chargerMaxCombo || (2 + this.bossPhase);
-
-      // Probabilité de continuer le combo (diminue avec chaque charge)
-      const continueChance = Math.max(0.2, 0.6 - this.chargerComboCount * 0.2);
-
-      if (this.chargerComboCount < maxCombo && Math.random() < continueChance) {
-        // === ENCHAÎNE UNE AUTRE CHARGE! ===
-        this.time.delayedCall(600, () => {
-          if (this.boss && this.boss.active) {
-            // Grognement de rage - il est lancé!
-            this.playSound('bossWarning');
-            this.chargerState = 'idle';
-            // Déclenche immédiatement une autre charge
-            this.time.delayedCall(200, () => {
-              this.bossChargerWindUp();
-            });
-          }
+      if (remainingDashes > 1) {
+        // Pause courte entre les dashes
+        this.time.delayedCall(200, () => {
+          this.bossChargerDashComboStep(remainingDashes - 1);
         });
       } else {
-        // Fin du combo - vraie recovery (fenêtre de punition)
-        this.chargerComboCount = 0;
-        this.time.delayedCall(1200, () => {
-          if (this.boss && this.boss.active) {
-            this.chargerState = 'idle';
-            this.tweens.add({
-              targets: this.boss,
-              scaleX: 1,
-              scaleY: 1,
-              duration: 200
-            });
-          }
+        // Fin du combo - recovery
+        this.time.delayedCall(500, () => {
+          this.chargerState = 'idle';
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 200
+          });
         });
       }
     });
   }
 
-  bossChargerShoot() {
+  // === MOVESET 3: TIR EN ÉVENTAIL ===
+  bossChargerFanShot() {
     if (!this.boss || !this.boss.active || this.bossShotPaused) return;
-    if (this.chargerState !== 'idle') return;
 
     this.chargerState = 'shooting';
     this.chargerLastStateChange = this.time.now;
+    this.chargerCooldowns.fanShot = 2500;
 
-    // SFX d'avertissement de tir
     this.playSound('bossWarning');
+    this.setBossTargetVelocity(0, 0);
 
-    // Choisir un pattern d'attaque aléatoire (variété!)
-    const attackPattern = Math.floor(Math.random() * 3);
-
-    // === TELEGRAPH VISUEL ===
+    // Telegraph
     this.tweens.add({
       targets: this.boss,
-      scaleX: 1.25,
-      scaleY: 1.25,
-      duration: 400,
+      scaleX: 1.2,
+      scaleY: 1.2,
+      duration: 350,
       ease: 'Quad.easeIn',
-      onUpdate: () => {
-        if (Math.random() < 0.5) {
-          const angle = Math.random() * Math.PI * 2;
-          const dist = 45;
-          this.emitParticles(this.boss.x + Math.cos(angle) * dist, this.boss.y + Math.sin(angle) * dist, {
-            count: 2,
-            colors: [0xff00ff, 0xaa00aa, 0xff4400],
-            minSpeed: 50,
-            maxSpeed: 100,
-            minSize: 3,
-            maxSize: 6,
-            life: 250,
-            angle: angle + Math.PI,
-            spread: 0.4,
-            fadeOut: true
-          });
+      onComplete: () => {
+        if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+
+        this.playSound('bossShoot');
+        const baseAngle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
+        const numBullets = 5 + this.bossPhase;
+        const spread = Math.PI * 0.4;
+
+        for (let i = 0; i < numBullets; i++) {
+          const angle = baseAngle - spread / 2 + (spread * i / (numBullets - 1));
+          this.createBossBullet(this.boss.x, this.boss.y, angle, 180 + this.bossPhase * 20);
         }
+
+        // Recul
+        this.tweens.add({
+          targets: this.boss,
+          scaleX: 0.9,
+          scaleY: 1.1,
+          duration: 100,
+          yoyo: true
+        });
+
+        this.emitParticles(this.boss.x, this.boss.y, {
+          count: 10,
+          colors: [0xff00ff, 0xff4400],
+          minSpeed: 80,
+          maxSpeed: 160,
+          minSize: 4,
+          maxSize: 10,
+          life: 300,
+          spread: spread,
+          angle: baseAngle,
+          fadeOut: true
+        });
+
+        this.time.delayedCall(400, () => {
+          this.chargerState = 'idle';
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 150
+          });
+        });
       }
     });
+  }
 
-    // Flash d'avertissement
-    this.cameras.main.flash(100, 255, 100, 100, false);
+  // === MOVESET 4: STOMP (ONDE DE CHOC) ===
+  bossChargerStomp() {
+    if (!this.boss || !this.boss.active) return;
 
-    this.time.delayedCall(450, () => {
-      if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+    this.chargerState = 'stomping';
+    this.chargerLastStateChange = this.time.now;
+    this.chargerCooldowns.stomp = 3500;
 
-      const baseAngle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
+    this.playSound('bossCharge');
+    this.setBossTargetVelocity(0, 0);
 
-      if (attackPattern === 0) {
-        // === PATTERN 1: ÉVENTAIL LARGE ===
-        const numBullets = 5 + this.bossPhase * 2;
-        const spreadAngle = Math.PI * 0.6; // 108 degrés
+    // Saut préparatoire
+    this.tweens.add({
+      targets: this.boss,
+      y: this.boss.y - 80,
+      scaleX: 0.85,
+      scaleY: 1.3,
+      duration: 400,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        if (!this.boss || !this.boss.active) return;
 
-        for (let i = 0; i < numBullets; i++) {
-          const angle = baseAngle - spreadAngle / 2 + (spreadAngle / (numBullets - 1)) * i;
-          this.createBossBullet(this.boss.x, this.boss.y, angle, 180);
-        }
-      } else if (attackPattern === 1) {
-        // === PATTERN 2: TRIPLE VAGUE ===
-        for (let wave = 0; wave < 3; wave++) {
-          this.time.delayedCall(wave * 150, () => {
+        // STOMP!
+        this.tweens.add({
+          targets: this.boss,
+          y: this.WORLD.groundY - 60,
+          scaleX: 1.4,
+          scaleY: 0.6,
+          duration: 200,
+          ease: 'Quad.easeIn',
+          onComplete: () => {
             if (!this.boss || !this.boss.active) return;
-            const numBullets = 3 + this.bossPhase;
-            const spreadAngle = Math.PI * 0.3;
-            const waveOffset = (wave - 1) * 0.15; // Décalage entre vagues
 
-            for (let i = 0; i < numBullets; i++) {
-              const angle = baseAngle + waveOffset - spreadAngle / 2 + (spreadAngle / (numBullets - 1)) * i;
-              this.createBossBullet(this.boss.x, this.boss.y, angle, 160 + wave * 30);
+            this.playSound('bossHit');
+            this.cameras.main.shake(300, 0.03);
+
+            // Onde de choc - projectiles au sol
+            const numWaves = 3 + this.bossPhase;
+            for (let i = 0; i < numWaves; i++) {
+              this.time.delayedCall(i * 100, () => {
+                if (!this.boss || !this.boss.active) return;
+                // Projectiles à gauche et à droite
+                this.createBossBullet(this.boss.x - 30 - i * 40, this.WORLD.groundY - 40, Math.PI, 120);
+                this.createBossBullet(this.boss.x + 30 + i * 40, this.WORLD.groundY - 40, 0, 120);
+              });
             }
-          });
-        }
-      } else {
-        // === PATTERN 3: CERCLE EXPLOSIF ===
-        const numBullets = 8 + this.bossPhase * 2;
-        for (let i = 0; i < numBullets; i++) {
-          const angle = (i / numBullets) * Math.PI * 2;
-          this.createBossBullet(this.boss.x, this.boss.y, angle, 140);
-        }
-        // Deuxième cercle décalé
-        this.time.delayedCall(200, () => {
-          if (!this.boss || !this.boss.active) return;
-          for (let i = 0; i < numBullets; i++) {
-            const angle = (i / numBullets) * Math.PI * 2 + Math.PI / numBullets;
-            this.createBossBullet(this.boss.x, this.boss.y, angle, 120);
+
+            // Particules d'impact
+            this.emitParticles(this.boss.x, this.WORLD.groundY - 30, {
+              count: 20,
+              colors: [0x886644, 0xaa8866, 0xff4400],
+              minSpeed: 100,
+              maxSpeed: 250,
+              minSize: 6,
+              maxSize: 14,
+              life: 400,
+              spread: Math.PI,
+              angle: -Math.PI / 2,
+              fadeOut: true
+            });
+
+            // Recovery
+            this.time.delayedCall(600, () => {
+              this.chargerState = 'idle';
+              this.tweens.add({
+                targets: this.boss,
+                scaleX: 1,
+                scaleY: 1,
+                duration: 200
+              });
+            });
           }
         });
       }
-
-      // SFX de tir puissant
-      this.playSound('bossBullet');
-
-      // Animation de recul puissant
-      this.tweens.add({
-        targets: this.boss,
-        scaleX: 0.85,
-        scaleY: 0.85,
-        duration: 100,
-        yoyo: true,
-        repeat: 1
-      });
-
-      // Screen shake
-      this.cameras.main.shake(150, 0.008);
-
-      // Recovery après tir
-      this.time.delayedCall(400, () => {
-        if (this.boss && this.boss.active) {
-          this.chargerState = 'idle';
-        }
-      });
     });
+  }
+
+  // === MOVESET 5: HORN TOSS (COUP DE CORNE) ===
+  bossChargerHornToss() {
+    if (!this.boss || !this.boss.active) return;
+
+    this.chargerState = 'attacking';
+    this.chargerLastStateChange = this.time.now;
+    this.chargerCooldowns.hornToss = 2000;
+
+    const toPlayerX = this.player.x - this.boss.x;
+
+    // Telegraph très court - attaque rapide!
+    this.playSound('bossWarning');
+
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 0.9,
+      scaleY: 1.1,
+      duration: 150,
+      onComplete: () => {
+        if (!this.boss || !this.boss.active) return;
+
+        this.playSound('bossDash');
+
+        // Coup de corne vers le haut
+        this.tweens.add({
+          targets: this.boss,
+          scaleX: 1.2,
+          scaleY: 0.8,
+          y: this.boss.y - 30,
+          x: this.boss.x + Math.sign(toPlayerX) * 50,
+          duration: 150,
+          ease: 'Quad.easeOut',
+          onComplete: () => {
+            // Créer une hitbox temporaire vers le haut
+            const hornHitbox = this.add.rectangle(
+              this.boss.x + Math.sign(toPlayerX) * 40,
+              this.boss.y - 30,
+              60, 50, 0xff0000, 0
+            );
+            this.physics.add.existing(hornHitbox, true);
+
+            // Check collision avec joueur
+            if (Phaser.Geom.Intersects.RectangleToRectangle(
+              hornHitbox.getBounds(),
+              this.player.getBounds()
+            )) {
+              this.playerTakeDamage(1);
+              // Envoyer le joueur en l'air
+              this.player.body.setVelocityY(-400);
+            }
+
+            hornHitbox.destroy();
+
+            // Particules
+            this.emitParticles(this.boss.x + Math.sign(toPlayerX) * 40, this.boss.y - 20, {
+              count: 8,
+              colors: [0xffaa00, 0xff4400],
+              minSpeed: 80,
+              maxSpeed: 180,
+              minSize: 4,
+              maxSize: 10,
+              life: 250,
+              spread: Math.PI / 2,
+              angle: -Math.PI / 2,
+              fadeOut: true
+            });
+
+            this.cameras.main.shake(100, 0.015);
+          }
+        });
+
+        // Retour
+        this.time.delayedCall(350, () => {
+          this.chargerState = 'idle';
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 1,
+            scaleY: 1,
+            y: this.WORLD.groundY - 60,
+            duration: 200
+          });
+        });
+      }
+    });
+  }
+
+  // === MOUVEMENT DE BASE ===
+  bossChargerMove() {
+    if (!this.boss || !this.boss.active) return;
+    if (this.chargerState !== 'idle') return;
+
+    const toPlayerX = this.player.x - this.boss.x;
+    const toPlayerY = this.player.y - this.boss.y;
+    const distToPlayer = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
+
+    // Orbite autour du joueur
+    if (this.chargerOrbitAngle === undefined) {
+      this.chargerOrbitAngle = Math.atan2(this.boss.y - this.player.y, this.boss.x - this.player.x);
+    }
+
+    const orbitSpeed = 0.6 + this.bossPhase * 0.2;
+    this.chargerOrbitAngle += orbitSpeed * 0.016;
+
+    const orbitRadius = 160 + Math.sin(this.time.now * 0.002) * 30;
+    const centerX = this.player.x;
+    const centerY = Math.min(this.player.y, this.WORLD.groundY - 100);
+
+    let targetX = centerX + Math.cos(this.chargerOrbitAngle) * orbitRadius;
+    let targetY = centerY + Math.sin(this.chargerOrbitAngle) * orbitRadius * 0.5;
+
+    targetX = Phaser.Math.Clamp(targetX, 60, this.WORLD.width - 60);
+    targetY = Phaser.Math.Clamp(targetY, 100, this.WORLD.groundY - 50);
+
+    const moveToX = targetX - this.boss.x;
+    const moveToY = targetY - this.boss.y;
+    const moveDist = Math.sqrt(moveToX * moveToX + moveToY * moveToY) || 1;
+
+    const moveSpeed = 150 + this.bossPhase * 30;
+    this.setBossTargetVelocity(
+      (moveToX / moveDist) * moveSpeed,
+      (moveToY / moveDist) * moveSpeed
+    );
+
+    // Respiration
+    if (!this.chargerBreathingTween || !this.chargerBreathingTween.isPlaying()) {
+      this.chargerBreathingTween = this.tweens.add({
+        targets: this.boss,
+        scaleX: { from: 1, to: 1.03 },
+        scaleY: { from: 1, to: 0.98 },
+        duration: 600,
+        yoyo: true,
+        ease: 'Sine.easeInOut'
+      });
+    }
+
+    // Fumée des naseaux
+    if (Math.random() < 0.08) {
+      const facing = Math.sign(toPlayerX) || 1;
+      this.emitParticles(this.boss.x + facing * 25, this.boss.y + 5, {
+        count: 2,
+        colors: [0x444444, 0x666666],
+        minSpeed: 15,
+        maxSpeed: 30,
+        minSize: 3,
+        maxSize: 5,
+        life: 300,
+        angle: facing > 0 ? 0 : Math.PI,
+        spread: 0.4,
+        fadeOut: true
+      });
+    }
+
+    // Esquive si joueur tombe sur le boss
+    const playerAbove = this.player.y < this.boss.y - 30;
+    const playerDescending = this.player.body.velocity.y > 80;
+    const playerClose = distToPlayer < 150;
+
+    if (playerAbove && playerClose && playerDescending && !this.bossDashCooldown) {
+      const escapeDir = toPlayerX !== 0 ? -Math.sign(toPlayerX) : (Math.random() < 0.5 ? -1 : 1);
+
+      this.chargerState = 'evading';
+      this.playSound('bossHurtCry');
+
+      this.bossLunge(escapeDir, -0.2, 400);
+      this.bossDashCooldown = true;
+
+      this.time.delayedCall(400, () => {
+        this.chargerState = 'idle';
+      });
+      this.time.delayedCall(1200, () => this.bossDashCooldown = false);
+    }
   }
 
   // ==========================================
