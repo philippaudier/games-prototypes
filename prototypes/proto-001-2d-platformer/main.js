@@ -4429,36 +4429,23 @@ class GameScene extends Phaser.Scene {
     this.time.delayedCall(500, () => this.spawnBoss());
   }
 
-  // === ARÈNE 1 : CHARGER - Arène compacte avec refuges ===
+  // === ARÈNE 1 : CHARGER - Arène ouverte pour combat dynamique ===
   createArenaCharger() {
     const cx = this.WORLD.width / 2;
     const gy = this.WORLD.groundY;
     const W = this.WORLD.width;
 
-    // Sol avec gaps
-    this.addPlatform(80, gy, 140, 16);
-    this.addPlatform(cx, gy, 240, 16);
-    this.addPlatform(W - 80, gy, 140, 16);
+    // Sol large et continu - espace ouvert pour que CHARGER charge
+    this.addPlatform(cx, gy, W - 60, 16);
 
-    // Niveau 1 - Refuges bas
-    this.addPlatform(140, gy - 72, 70, 12, 0x5a5a7a);
-    this.addPlatform(cx - 140, gy - 72, 70, 12, 0x5a5a7a);
-    this.addPlatform(cx + 140, gy - 72, 70, 12, 0x5a5a7a);
-    this.addPlatform(W - 140, gy - 72, 70, 12, 0x5a5a7a);
+    // Seulement 2 plateformes de refuge (gauche et droite)
+    this.addPlatform(100, gy - 100, 80, 12, 0x5a5a7a);
+    this.addPlatform(W - 100, gy - 100, 80, 12, 0x5a5a7a);
 
-    // Niveau 2 - Plateformes moyennes
-    this.addPlatform(cx - 220, gy - 140, 80, 12, 0x5a5a7a);
-    this.addPlatform(cx, gy - 128, 100, 12, 0x5a5a7a);
-    this.addPlatform(cx + 220, gy - 140, 80, 12, 0x5a5a7a);
+    // Une plateforme centrale haute pour sauter par-dessus CHARGER
+    this.addPlatform(cx, gy - 180, 100, 12, 0x6a6a8a);
 
-    // Niveau 3 - Plateformes hautes
-    this.addPlatform(cx - 120, gy - 208, 70, 12, 0x5a5a7a);
-    this.addPlatform(cx + 120, gy - 208, 70, 12, 0x5a5a7a);
-
-    // Sommet
-    this.addPlatform(cx, gy - 272, 90, 12, 0x6a6a8a);
-
-    // Bounce pads
+    // Bounce pads aux extrémités
     this.createBouncePad(40, gy - 15, 35, 450);
     this.createBouncePad(W - 40, gy - 15, 35, 450);
   }
@@ -5933,43 +5920,69 @@ class GameScene extends Phaser.Scene {
     // - Tirs en éventail puissants
     // - Recovery windows pour punir
 
-    this.chargerState = 'idle'; // idle, circling, winding, charging, recovering, shooting, evading
+    this.chargerState = 'idle'; // idle, winding, charging, recovering, shooting, evading
     this.chargerComboCount = 0;
-    this.chargerOrbitAngle = Math.random() * Math.PI * 2; // Angle d'orbite initial
-    this.chargerOrbitDir = Math.random() < 0.5 ? 1 : -1; // Direction d'orbite
-    this.chargerOrbitRadius = 200; // Distance du joueur
+    this.chargerLastStateChange = 0; // Pour éviter les états bloqués
 
-    // Commence à cercler
+    // Commence mobile
     this.setBossTargetVelocity(0, 0);
 
-    // Timer d'état idle (vérification périodique pour animations)
+    // Timer de mouvement - TRÈS fréquent pour être réactif
     this.bossMoveTimer = this.time.addEvent({
-      delay: 400, // Check fréquent pour animations idle
+      delay: 100, // Check très fréquent!
       callback: this.bossChargerMove,
       callbackScope: this,
       loop: true
     });
 
-    // Tir en éventail - AGRESSIF
+    // Tir en éventail - avec RNG
+    const shootDelay = 1500 + Math.random() * 800;
     this.bossShootTimer = this.time.addEvent({
-      delay: 1800, // Tirs fréquents!
-      callback: this.bossChargerShoot,
+      delay: shootDelay,
+      callback: () => {
+        this.bossChargerShoot();
+        // Randomiser le prochain délai
+        this.bossShootTimer.delay = 1200 + Math.random() * 1000;
+      },
       callbackScope: this,
       loop: true
     });
 
-    // Charge DÉVASTATRICE - attaque signature FRÉQUENTE
+    // Charge DÉVASTATRICE - avec RNG
+    const chargeDelay = 2500 + Math.random() * 1000;
     this.chargerChargeTimer = this.time.addEvent({
-      delay: 2800, // Charges très fréquentes!
-      callback: this.bossChargerWindUp,
+      delay: chargeDelay,
+      callback: () => {
+        this.bossChargerWindUp();
+        // Randomiser le prochain délai
+        this.chargerChargeTimer.delay = 2000 + Math.random() * 1500;
+      },
       callbackScope: this,
       loop: true
     });
 
-    // Rugissement périodique (intimidation)
+    // Rugissement périodique (intimidation) - avec RNG
     this.chargerRoarTimer = this.time.addEvent({
-      delay: 5000,
-      callback: this.bossChargerRoar,
+      delay: 4000 + Math.random() * 2000,
+      callback: () => {
+        this.bossChargerRoar();
+        this.chargerRoarTimer.delay = 4000 + Math.random() * 3000;
+      },
+      callbackScope: this,
+      loop: true
+    });
+
+    // Safety: reset état si bloqué trop longtemps
+    this.time.addEvent({
+      delay: 500,
+      callback: () => {
+        if (!this.boss || !this.boss.active) return;
+        // Si l'état n'a pas changé depuis 3 secondes et n'est pas idle, forcer idle
+        if (this.chargerState !== 'idle' &&
+            this.time.now - this.chargerLastStateChange > 3000) {
+          this.chargerState = 'idle';
+        }
+      },
       callbackScope: this,
       loop: true
     });
@@ -6017,65 +6030,75 @@ class GameScene extends Phaser.Scene {
     if (!this.boss || !this.boss.active) return;
     if (this.chargerState !== 'idle') return;
 
-    // === CHARGER: LE TAUREAU - Cercle autour du joueur comme un prédateur ===
+    // === CHARGER: Traque le joueur agressivement ===
 
     const toPlayerX = this.player.x - this.boss.x;
     const toPlayerY = this.player.y - this.boss.y;
     const distToPlayer = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
 
-    // === COMPORTEMENT DE CERCLE AUTOUR DU JOUEUR ===
-    // Le boss orbite autour du joueur, maintenant la pression
+    // === COMPORTEMENT: Suivre le joueur horizontalement, rester à distance verticale ===
+    // Le boss traque le joueur sur l'axe X mais garde une certaine hauteur
 
-    // Mettre à jour l'angle d'orbite
-    const orbitSpeed = 0.015 + this.bossPhase * 0.005; // Plus rapide selon la phase
-    this.chargerOrbitAngle += orbitSpeed * this.chargerOrbitDir;
+    // Distance idéale du joueur (pas trop près, pas trop loin)
+    const idealDist = 120 + Math.random() * 60;
 
-    // Changer parfois de direction pour être imprévisible
-    if (Math.random() < 0.005) {
-      this.chargerOrbitDir *= -1;
+    // Cible: même hauteur que le sol ou légèrement au-dessus du joueur
+    let targetX, targetY;
+
+    if (distToPlayer > idealDist + 50) {
+      // Trop loin - se rapprocher du joueur
+      targetX = this.player.x + (toPlayerX > 0 ? -idealDist : idealDist);
+      targetY = this.WORLD.groundY - 80;
+    } else if (distToPlayer < idealDist - 30) {
+      // Trop près - reculer un peu
+      targetX = this.boss.x - Math.sign(toPlayerX) * 50;
+      targetY = this.WORLD.groundY - 80;
+    } else {
+      // Bonne distance - mouvement latéral pour être menaçant
+      targetX = this.boss.x + (Math.random() - 0.5) * 100;
+      targetY = this.WORLD.groundY - 80;
     }
-
-    // Position cible sur l'orbite (autour du joueur)
-    const targetRadius = this.chargerOrbitRadius - this.bossPhase * 20; // Plus proche selon phase
-    const targetX = this.player.x + Math.cos(this.chargerOrbitAngle) * targetRadius;
-    const targetY = this.player.y + Math.sin(this.chargerOrbitAngle) * Math.min(targetRadius * 0.4, 80); // Orbite aplatie (plus horizontal)
 
     // Limiter dans l'arène
-    const clampedX = Phaser.Math.Clamp(targetX, 100, this.WORLD.width - 100);
-    const clampedY = Phaser.Math.Clamp(targetY, 150, this.WORLD.groundY - 80);
+    targetX = Phaser.Math.Clamp(targetX, 80, this.WORLD.width - 80);
+    targetY = Phaser.Math.Clamp(targetY, 120, this.WORLD.groundY - 60);
 
-    // Mouvement vers la position cible
-    const moveToX = clampedX - this.boss.x;
-    const moveToY = clampedY - this.boss.y;
+    // Mouvement vers la cible
+    const moveToX = targetX - this.boss.x;
+    const moveToY = targetY - this.boss.y;
     const moveDist = Math.sqrt(moveToX * moveToX + moveToY * moveToY) || 1;
 
-    // Vitesse de mouvement (modérée, menaçante)
-    const moveSpeed = 80 + this.bossPhase * 20;
-    if (moveDist > 10) {
+    // Vitesse de mouvement - AGRESSIF
+    const moveSpeed = 100 + this.bossPhase * 30;
+    if (moveDist > 15) {
       this.setBossTargetVelocity(
         (moveToX / moveDist) * moveSpeed,
-        (moveToY / moveDist) * moveSpeed * 0.6 // Moins vertical
+        (moveToY / moveDist) * moveSpeed * 0.5
       );
     } else {
-      this.setBossTargetVelocity(0, 0);
+      // Légère dérive même à l'arrêt
+      this.setBossTargetVelocity(
+        (Math.random() - 0.5) * 30,
+        0
+      );
     }
 
-    // Animation de respiration/pulsation menaçante pendant le mouvement
+    // Animation de respiration/pulsation menaçante
     if (!this.chargerBreathingTween || !this.chargerBreathingTween.isPlaying()) {
       this.chargerBreathingTween = this.tweens.add({
         targets: this.boss,
         scaleX: { from: 1, to: 1.05 },
         scaleY: { from: 1, to: 0.97 },
-        duration: 600,
+        duration: 500,
         yoyo: true,
         repeat: 0,
         ease: 'Sine.easeInOut'
       });
     }
 
-    // Particules de fumée des naseaux pendant le mouvement
-    if (Math.random() < 0.08) {
-      const facing = Math.sign(this.player.x - this.boss.x) || 1;
+    // Particules de fumée des naseaux
+    if (Math.random() < 0.1) {
+      const facing = Math.sign(toPlayerX) || 1;
       const noseX = this.boss.x + facing * 25;
       this.emitParticles(noseX, this.boss.y + 5, {
         count: 2,
@@ -6100,9 +6123,7 @@ class GameScene extends Phaser.Scene {
       const escapeDir = toPlayerX !== 0 ? -Math.sign(toPlayerX) : (Math.random() < 0.5 ? -1 : 1);
 
       this.chargerState = 'evading';
-
-      // Inverser direction d'orbite après esquive
-      this.chargerOrbitDir *= -1;
+      this.chargerLastStateChange = this.time.now;
 
       // Grognement d'agacement
       this.playSound('bossHurtCry');
@@ -6158,6 +6179,7 @@ class GameScene extends Phaser.Scene {
     if (this.chargerState !== 'idle') return;
 
     this.chargerState = 'winding';
+    this.chargerLastStateChange = this.time.now;
     this.setBossTargetVelocity(0, 0); // Arrêt complet
 
     // SFX de préparation de charge
@@ -6208,6 +6230,7 @@ class GameScene extends Phaser.Scene {
     if (!this.boss || !this.boss.active) return;
 
     this.chargerState = 'charging';
+    this.chargerLastStateChange = this.time.now;
 
     // === SFX DE CHARGE DÉVASTATRICE ===
     this.playSound('bossDash');
@@ -6301,6 +6324,7 @@ class GameScene extends Phaser.Scene {
       if (!this.boss || !this.boss.active) return;
 
       this.chargerState = 'recovering';
+      this.chargerLastStateChange = this.time.now;
       this.setBossTargetVelocity(0, 0);
       this.boss.body.setVelocity(0, 0);
 
@@ -6388,6 +6412,7 @@ class GameScene extends Phaser.Scene {
     if (this.chargerState !== 'idle') return;
 
     this.chargerState = 'shooting';
+    this.chargerLastStateChange = this.time.now;
 
     // SFX d'avertissement de tir
     this.playSound('bossWarning');
