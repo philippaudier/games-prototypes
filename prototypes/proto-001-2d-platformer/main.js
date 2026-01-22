@@ -6170,6 +6170,9 @@ class GameScene extends Phaser.Scene {
     this.chargerRageMode = false;
     this.chargerLastAttack = 0;
 
+    // CHARGER passe à travers tout - pas de collision avec les obstacles
+    this.boss.body.setCollideWorldBounds(false);
+
     // Position au sol
     this.boss.y = this.WORLD.groundY - 60;
     this.setBossTargetVelocity(0, 0);
@@ -11580,47 +11583,47 @@ class GameScene extends Phaser.Scene {
         enemy.currentScaleX = 1;
         enemy.currentScaleY = 1;
       }
-      enemy.animTime += delta * 0.001; // Beaucoup plus lent
+      enemy.animTime += delta * 0.002; // Animation plus rapide
 
       // Ne pas écraser le scale si en esquive (géré dans le state)
       if (enemy.aiState !== 'dodge') {
         const velX = Math.abs(enemy.body.velocity.x);
         const velY = enemy.body.velocity.y;
 
-        // Calculer le scale cible
+        // Calculer le scale cible (amplitudes augmentées)
         let targetScaleX = 1;
         let targetScaleY = 1;
 
-        if (velX > 100) {
-          // En mouvement rapide: stretch horizontal
-          const stretchFactor = Math.min(velX / 300, 0.15);
+        if (velX > 80) {
+          // En mouvement rapide: stretch horizontal visible
+          const stretchFactor = Math.min(velX / 200, 0.3);
           targetScaleX = 1 + stretchFactor;
-          targetScaleY = 1 - stretchFactor * 0.4;
-        } else if (velX > 30) {
-          // En mouvement lent: léger stretch
-          targetScaleX = 1.03;
-          targetScaleY = 0.98;
+          targetScaleY = 1 - stretchFactor * 0.5;
+        } else if (velX > 20) {
+          // En mouvement lent: stretch modéré
+          targetScaleX = 1.1;
+          targetScaleY = 0.92;
         } else if (enemy.body.blocked.down) {
-          // Au sol en attente: respiration douce
-          const breathe = Math.sin(enemy.animTime * 0.8) * 0.04;
-          targetScaleX = 1 + breathe * 0.3;
+          // Au sol en attente: respiration visible
+          const breathe = Math.sin(enemy.animTime) * 0.1;
+          targetScaleX = 1 + breathe * 0.4;
           targetScaleY = 1 - breathe;
         }
 
-        // En chute: stretch vertical
-        if (velY > 50 && !enemy.body.blocked.down) {
-          targetScaleX = 0.92;
-          targetScaleY = 1.1;
+        // En chute: stretch vertical prononcé
+        if (velY > 40 && !enemy.body.blocked.down) {
+          targetScaleX = 0.85;
+          targetScaleY = 1.2;
         }
 
-        // Interpolation douce vers le scale cible (évite les tremblements)
-        enemy.currentScaleX = Phaser.Math.Linear(enemy.currentScaleX, targetScaleX, 0.08);
-        enemy.currentScaleY = Phaser.Math.Linear(enemy.currentScaleY, targetScaleY, 0.08);
+        // Interpolation douce vers le scale cible
+        enemy.currentScaleX = Phaser.Math.Linear(enemy.currentScaleX, targetScaleX, 0.12);
+        enemy.currentScaleY = Phaser.Math.Linear(enemy.currentScaleY, targetScaleY, 0.12);
         enemy.setScale(enemy.currentScaleX, enemy.currentScaleY);
 
-        // Rotation légère basée sur la direction (plus douce)
-        const targetRotation = (enemy.body.velocity.x / 400) * 0.1;
-        enemy.rotation = Phaser.Math.Linear(enemy.rotation || 0, targetRotation, 0.05);
+        // Rotation basée sur la direction (plus visible)
+        const targetRotation = (enemy.body.velocity.x / 250) * 0.15;
+        enemy.rotation = Phaser.Math.Linear(enemy.rotation || 0, targetRotation, 0.08);
       }
 
       // Particules occasionnelles selon l'état
