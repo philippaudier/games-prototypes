@@ -11518,53 +11518,50 @@ class GameScene extends Phaser.Scene {
       // Initialiser le temps d'animation si pas fait
       if (enemy.animTime === undefined) {
         enemy.animTime = Math.random() * Math.PI * 2; // Phase aléatoire
-        enemy.baseScaleX = 1;
-        enemy.baseScaleY = 1;
+        enemy.currentScaleX = 1;
+        enemy.currentScaleY = 1;
       }
-      enemy.animTime += delta * 0.005;
+      enemy.animTime += delta * 0.001; // Beaucoup plus lent
 
       // Ne pas écraser le scale si en esquive (géré dans le state)
       if (enemy.aiState !== 'dodge') {
         const velX = Math.abs(enemy.body.velocity.x);
         const velY = enemy.body.velocity.y;
 
-        // Bobbing de base (respiration)
-        const breathe = Math.sin(enemy.animTime * 2) * 0.03;
-
-        // Squash/Stretch basé sur la vélocité
-        let scaleX = 1;
-        let scaleY = 1;
+        // Calculer le scale cible
+        let targetScaleX = 1;
+        let targetScaleY = 1;
 
         if (velX > 100) {
           // En mouvement rapide: stretch horizontal
-          const stretchFactor = Math.min(velX / 200, 0.25);
-          scaleX = 1 + stretchFactor;
-          scaleY = 1 - stretchFactor * 0.5;
+          const stretchFactor = Math.min(velX / 300, 0.15);
+          targetScaleX = 1 + stretchFactor;
+          targetScaleY = 1 - stretchFactor * 0.4;
         } else if (velX > 30) {
           // En mouvement lent: léger stretch
-          scaleX = 1.05;
-          scaleY = 0.97;
-        }
-
-        // Au sol en attente: squash
-        if (enemy.body.blocked.down && velX < 10) {
-          const squash = Math.abs(Math.sin(enemy.animTime * 1.5)) * 0.08;
-          scaleX = 1 + squash;
-          scaleY = 1 - squash * 0.5;
+          targetScaleX = 1.03;
+          targetScaleY = 0.98;
+        } else if (enemy.body.blocked.down) {
+          // Au sol en attente: respiration douce
+          const breathe = Math.sin(enemy.animTime * 0.8) * 0.04;
+          targetScaleX = 1 + breathe * 0.3;
+          targetScaleY = 1 - breathe;
         }
 
         // En chute: stretch vertical
         if (velY > 50 && !enemy.body.blocked.down) {
-          scaleX = 0.9;
-          scaleY = 1.15;
+          targetScaleX = 0.92;
+          targetScaleY = 1.1;
         }
 
-        // Appliquer avec bobbing
-        enemy.setScale(scaleX + breathe * 0.2, scaleY + breathe);
+        // Interpolation douce vers le scale cible (évite les tremblements)
+        enemy.currentScaleX = Phaser.Math.Linear(enemy.currentScaleX, targetScaleX, 0.08);
+        enemy.currentScaleY = Phaser.Math.Linear(enemy.currentScaleY, targetScaleY, 0.08);
+        enemy.setScale(enemy.currentScaleX, enemy.currentScaleY);
 
-        // Rotation légère basée sur la direction
-        const targetRotation = (enemy.body.velocity.x / 300) * 0.15;
-        enemy.rotation = Phaser.Math.Linear(enemy.rotation || 0, targetRotation, 0.1);
+        // Rotation légère basée sur la direction (plus douce)
+        const targetRotation = (enemy.body.velocity.x / 400) * 0.1;
+        enemy.rotation = Phaser.Math.Linear(enemy.rotation || 0, targetRotation, 0.05);
       }
 
       // Particules occasionnelles selon l'état
