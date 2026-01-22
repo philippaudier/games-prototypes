@@ -7,6 +7,12 @@ class MenuScene extends Phaser.Scene {
   }
 
   create() {
+    // Désactiver le double-tap fullscreen dans le menu pour éviter les conflits
+    if (window.setFullscreenDoubleTap) window.setFullscreenDoubleTap(false);
+
+    // Détecter si on est sur mobile
+    this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
     const W = 960;
     const H = 540;
     const cx = W / 2;
@@ -138,13 +144,15 @@ class MenuScene extends Phaser.Scene {
       lineSpacing: 8
     }).setOrigin(0.5);
 
-    // Bouton START
-    const startBtn = this.add.rectangle(rightX + 150, 360, 180, 50, 0x00aa55);
+    // Bouton START - plus grand sur mobile
+    const startBtnWidth = this.isMobile ? 220 : 180;
+    const startBtnHeight = this.isMobile ? 60 : 50;
+    const startBtn = this.add.rectangle(rightX + 150, 360, startBtnWidth, startBtnHeight, 0x00aa55);
     startBtn.setStrokeStyle(3, 0x00ff88);
     startBtn.setInteractive({ useHandCursor: true });
 
-    this.startText = this.add.text(rightX + 150, 360, 'START', {
-      fontSize: '24px',
+    this.startText = this.add.text(rightX + 150, 360, this.isMobile ? 'JOUER' : 'START', {
+      fontSize: this.isMobile ? '28px' : '24px',
       fontFamily: 'monospace',
       color: '#ffffff'
     }).setOrigin(0.5);
@@ -159,10 +167,24 @@ class MenuScene extends Phaser.Scene {
       startBtn.setScale(1);
       this.startText.setScale(1);
     });
-    startBtn.on('pointerdown', () => this.startGame());
+    // Support pointerdown ET pointerup pour mobile (avec protection contre double déclenchement)
+    let startPressed = false;
+    startBtn.on('pointerdown', () => {
+      if (!startPressed) {
+        startPressed = true;
+        this.startGame();
+      }
+    });
+    startBtn.on('pointerup', () => {
+      if (!startPressed) {
+        startPressed = true;
+        this.startGame();
+      }
+    });
+    startBtn.on('pointerout', () => { startPressed = false; });
 
     // Instructions
-    this.add.text(rightX + 150, 410, 'Double-clic ou ENTRÉE', {
+    this.add.text(rightX + 150, 410, this.isMobile ? 'Appuyer pour jouer' : 'Double-clic ou ENTRÉE', {
       fontSize: '10px',
       fontFamily: 'monospace',
       color: '#555555'
@@ -203,8 +225,14 @@ class MenuScene extends Phaser.Scene {
         btn.setFillStyle(isBoss ? 0x331100 : 0x222233);
       }
     });
-    btn.on('pointerdown', () => {
-      if (this.lastClickedLevel === level && Date.now() - this.lastClickTime < 300) {
+
+    // Utiliser pointerup pour meilleure compatibilité mobile
+    let buttonPressed = false;
+    const handleClick = () => {
+      if (buttonPressed) return;
+      buttonPressed = true;
+
+      if (this.lastClickedLevel === level && Date.now() - this.lastClickTime < 400) {
         this.startGame();
       } else {
         this.selectLevel(level);
@@ -212,7 +240,14 @@ class MenuScene extends Phaser.Scene {
       }
       this.lastClickedLevel = level;
       this.lastClickTime = Date.now();
-    });
+
+      // Reset après un court délai
+      this.time.delayedCall(100, () => { buttonPressed = false; });
+    };
+
+    btn.on('pointerdown', handleClick);
+    // Sur mobile, pointerup est parfois plus fiable
+    btn.on('pointerup', handleClick);
   }
 
   selectLevel(level) {
@@ -356,6 +391,9 @@ class GameScene extends Phaser.Scene {
   }
 
   create() {
+    // Activer le double-tap fullscreen dans le jeu
+    if (window.setFullscreenDoubleTap) window.setFullscreenDoubleTap(true);
+
     // Config gameplay - Tuné pour un feel "pro" style Celeste/Super Meat Boy
     this.config = {
       // Mouvement horizontal - valeurs ajustées pour contrôle précis
@@ -6514,6 +6552,11 @@ class GameScene extends Phaser.Scene {
     if (this.boss.y > maxY) {
       this.boss.targetVelY = -Math.abs(this.boss.targetVelY) - 30;
       if (phys.weight === 'bouncy') body.velocity.y *= -0.8;
+      // SPLITTER: hard clamp pour éviter de sortir de l'écran
+      if (this.bossType === 3) {
+        this.boss.y = maxY;
+        if (body.velocity.y > 0) body.velocity.y = 0;
+      }
     }
 
     // === EFFETS VISUELS SELON LE POIDS ===
@@ -7959,7 +8002,13 @@ class GameScene extends Phaser.Scene {
           if (!this.boss || !this.boss.active) return;
 
           const dist = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
-          this.bossLunge(toPlayerX / dist * 0.7, toPlayerY / dist * 0.4, 300);
+          // Limiter le lunge vers le bas si le boss est déjà bas
+          const maxY = this.WORLD.groundY - 80;
+          let lungeY = toPlayerY / dist * 0.4;
+          if (this.boss.y > maxY - 50) {
+            lungeY = Math.min(lungeY, 0); // Pas de lunge vers le bas
+          }
+          this.bossLunge(toPlayerX / dist * 0.7, lungeY, 300);
 
           // Squash après bounce
           this.tweens.add({
@@ -12511,9 +12560,20 @@ class GameScene extends Phaser.Scene {
           this.bossDashing = true;
 
           const dashSpeed = 350 + this.bossPhase * 50;
+
+          // SPLITTER: limiter le dash vers le bas pour éviter de sortir de l'écran
+          let dashVelY = (toPlayerY / dist) * dashSpeed * 0.7;
+          if (this.bossType === 3) {
+            // SPLITTER ne peut pas descendre sous une certaine hauteur
+            const maxY = this.WORLD.groundY - 80;
+            if (this.boss.y > maxY - 50) {
+              dashVelY = Math.min(dashVelY, 0); // Pas de dash vers le bas si déjà bas
+            }
+          }
+
           this.boss.body.setVelocity(
             (toPlayerX / dist) * dashSpeed,
-            (toPlayerY / dist) * dashSpeed * 0.7
+            dashVelY
           );
 
           this.time.delayedCall(400, () => {
@@ -14421,6 +14481,12 @@ const config = {
     min: { width: 480, height: 270 },
     max: { width: 1920, height: 1080 }
   },
+  input: {
+    activePointers: 3,
+    touch: {
+      capture: true
+    }
+  },
   physics: {
     default: 'arcade',
     arcade: {
@@ -14450,9 +14516,11 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Double-tap for fullscreen on mobile
+// Double-tap for fullscreen on mobile (disabled in menu to avoid conflicts)
 let lastTap = 0;
+let fullscreenDoubleTapEnabled = false;
 document.getElementById('game').addEventListener('touchend', (e) => {
+  if (!fullscreenDoubleTapEnabled) return; // Désactivé dans le menu
   const currentTime = new Date().getTime();
   const tapLength = currentTime - lastTap;
   if (tapLength < 300 && tapLength > 0) {
@@ -14465,3 +14533,6 @@ document.getElementById('game').addEventListener('touchend', (e) => {
   }
   lastTap = currentTime;
 });
+
+// Export pour que les scènes puissent activer/désactiver
+window.setFullscreenDoubleTap = (enabled) => { fullscreenDoubleTapEnabled = enabled; };
