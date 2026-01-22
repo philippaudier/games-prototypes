@@ -4902,7 +4902,7 @@ class GameScene extends Phaser.Scene {
     this.oneWayPlatforms = [];
 
     const bossNum = Math.floor(this.currentLevel / 5); // 1, 2, 3, 4, 5...
-    const bossType = ((bossNum - 1) % 5) + 1; // Cycle 1-5
+    const bossType = ((bossNum - 1) % 10) + 1; // Cycle 1-10 (10 boss uniques)
     const W = this.WORLD.width;
     const H = this.WORLD.height;
     const centerX = W / 2;
@@ -4923,6 +4923,11 @@ class GameScene extends Phaser.Scene {
       case 3: this.createArenaSplitter(); break;
       case 4: this.createArenaGuardian(); break;
       case 5: this.createArenaSummoner(); break;
+      case 6: this.createArenaCrusher(); break;
+      case 7: this.createArenaPhantom(); break;
+      case 8: this.createArenaBerserker(); break;
+      case 9: this.createArenaArchitect(); break;
+      case 10: this.createArenaTwins(); break;
     }
 
     // Player spawn - au centre de l'arène au sol (sprite "Sunday" 16x28 scalé x2)
@@ -5169,6 +5174,166 @@ class GameScene extends Phaser.Scene {
     // Spikes en bas dans les gaps
     this.createSpikes(cx - 240, gy + 5, 50);
     this.createSpikes(cx + 240, gy + 5, 50);
+  }
+
+  // === ARÈNE 6 : CRUSHER - Arène avec stalactites et dangers aériens ===
+  createArenaCrusher() {
+    const cx = this.WORLD.width / 2;
+    const gy = this.WORLD.groundY;
+    const W = this.WORLD.width;
+
+    // Sol large pour courir - le CRUSHER suit le joueur
+    this.addPlatform(cx, gy, W - 80, 16);
+
+    // Plateformes de refuge sur les côtés (pour éviter les slams)
+    this.addPlatform(80, gy - 90, 90, 12, 0x6a5a4a);
+    this.addPlatform(W - 80, gy - 90, 90, 12, 0x6a5a4a);
+
+    // Stalactites visuelles (danger depuis le haut)
+    const stalactiteColor = 0x5a4a3a;
+    for (let i = 0; i < 5; i++) {
+      const sx = 150 + i * 165;
+      const stalactite = this.add.triangle(sx, 30, 0, 0, -15, -40, 15, -40, stalactiteColor);
+      stalactite.setDepth(-5);
+    }
+
+    // Plateforme centrale haute (refuge contre shockwave)
+    this.addPlatform(cx, gy - 180, 120, 12, 0x7a6a5a);
+
+    // Plateformes intermédiaires
+    this.addPlatform(cx - 200, gy - 140, 80, 12, 0x6a5a4a);
+    this.addPlatform(cx + 200, gy - 140, 80, 12, 0x6a5a4a);
+
+    // Bounce pads pour échapper rapidement
+    this.createBouncePad(cx - 300, gy - 15, 40, 500);
+    this.createBouncePad(cx + 300, gy - 15, 40, 500);
+  }
+
+  // === ARÈNE 7 : PHANTOM - Arène avec miroirs/portails ===
+  createArenaPhantom() {
+    const cx = this.WORLD.width / 2;
+    const gy = this.WORLD.groundY;
+    const W = this.WORLD.width;
+
+    // Sol en segments pour mobilité
+    this.addPlatform(100, gy, 160, 16);
+    this.addPlatform(cx, gy, 180, 16);
+    this.addPlatform(W - 100, gy, 160, 16);
+
+    // "Miroirs" visuels (piliers brillants)
+    const mirrorColor = 0x9966ff;
+    this.addPlatform(cx - 220, gy - 100, 15, 180, mirrorColor);
+    this.addPlatform(cx + 220, gy - 100, 15, 180, mirrorColor);
+
+    // Plateformes flottantes (zone spectrale)
+    this.addPlatform(cx - 140, gy - 80, 70, 12, 0x6a5a8a);
+    this.addPlatform(cx + 140, gy - 80, 70, 12, 0x6a5a8a);
+    this.addPlatform(cx, gy - 130, 90, 12, 0x7a6a9a);
+
+    // Niveau haut
+    this.addPlatform(cx - 180, gy - 200, 80, 12, 0x6a5a8a);
+    this.addPlatform(cx + 180, gy - 200, 80, 12, 0x6a5a8a);
+    this.addPlatform(cx, gy - 260, 100, 12, 0x7a6a9a);
+
+    // One-way platforms (traversables comme des fantômes)
+    this.createOneWayPlatform(cx - 80, gy - 170, 60);
+    this.createOneWayPlatform(cx + 80, gy - 170, 60);
+
+    // Moving platforms (mouvement spectral)
+    this.createMovingPlatform(cx - 300, gy - 140, 55, 12, { vertical: true, distance: 100, speed: 50 });
+    this.createMovingPlatform(cx + 300, gy - 140, 55, 12, { vertical: true, distance: 100, speed: 50 });
+  }
+
+  // === ARÈNE 8 : BERSERKER - Arène avec zones de danger/feu ===
+  createArenaBerserker() {
+    const cx = this.WORLD.width / 2;
+    const gy = this.WORLD.groundY;
+    const W = this.WORLD.width;
+
+    // Sol principal avec gaps dangereux
+    this.addPlatform(150, gy, 260, 16);
+    this.addPlatform(W - 150, gy, 260, 16);
+
+    // Zones de danger visuelles (feu/lave au centre)
+    const fireZone = this.add.rectangle(cx, gy + 10, 180, 30, 0xff4400, 0.5);
+    fireZone.setDepth(-3);
+    // Spikes dans la zone de feu
+    this.createSpikes(cx, gy + 5, 150);
+
+    // Plateformes au-dessus de la zone de feu
+    this.addPlatform(cx - 60, gy - 60, 70, 12, 0x7a5a4a);
+    this.addPlatform(cx + 60, gy - 60, 70, 12, 0x7a5a4a);
+    this.addPlatform(cx, gy - 120, 80, 12, 0x8a6a5a);
+
+    // Plateformes latérales
+    this.addPlatform(80, gy - 100, 80, 12, 0x6a4a3a);
+    this.addPlatform(W - 80, gy - 100, 80, 12, 0x6a4a3a);
+
+    // Niveau haut
+    this.addPlatform(cx - 180, gy - 180, 90, 12, 0x7a5a4a);
+    this.addPlatform(cx + 180, gy - 180, 90, 12, 0x7a5a4a);
+    this.addPlatform(cx, gy - 230, 100, 12, 0x8a6a5a);
+
+    // Bounce pads pour fuir rapidement
+    this.createBouncePad(60, gy - 15, 35, 450);
+    this.createBouncePad(W - 60, gy - 15, 35, 450);
+  }
+
+  // === ARÈNE 9 : ARCHITECT - Arène minimaliste (le boss construit) ===
+  createArenaArchitect() {
+    const cx = this.WORLD.width / 2;
+    const gy = this.WORLD.groundY;
+    const W = this.WORLD.width;
+
+    // Sol complet - l'ARCHITECT construit les obstacles
+    this.addPlatform(cx, gy, W - 60, 16);
+
+    // Seulement quelques plateformes de base
+    this.addPlatform(100, gy - 100, 90, 12, 0x4a6a5a);
+    this.addPlatform(W - 100, gy - 100, 90, 12, 0x4a6a5a);
+
+    // Plateforme centrale
+    this.addPlatform(cx, gy - 160, 120, 12, 0x5a7a6a);
+
+    // Plateformes hautes
+    this.addPlatform(cx - 200, gy - 230, 80, 12, 0x4a6a5a);
+    this.addPlatform(cx + 200, gy - 230, 80, 12, 0x4a6a5a);
+
+    // L'arène est volontairement simple car le boss construit des structures
+  }
+
+  // === ARÈNE 10 : TWINS - Arène divisée en deux zones ===
+  createArenaTwins() {
+    const cx = this.WORLD.width / 2;
+    const gy = this.WORLD.groundY;
+    const W = this.WORLD.width;
+
+    // Sol divisé en deux parties
+    this.addPlatform(cx - 220, gy, 280, 16);
+    this.addPlatform(cx + 220, gy, 280, 16);
+
+    // Plateforme centrale (pont entre les zones)
+    this.addPlatform(cx, gy - 80, 100, 12, 0x8a6a4a);
+
+    // Zone gauche (Twin 1)
+    this.addPlatform(cx - 280, gy - 100, 90, 12, 0x7a5a3a);
+    this.addPlatform(cx - 160, gy - 160, 80, 12, 0x7a5a3a);
+    this.addPlatform(cx - 280, gy - 220, 90, 12, 0x7a5a3a);
+
+    // Zone droite (Twin 2)
+    this.addPlatform(cx + 280, gy - 100, 90, 12, 0x7a5a3a);
+    this.addPlatform(cx + 160, gy - 160, 80, 12, 0x7a5a3a);
+    this.addPlatform(cx + 280, gy - 220, 90, 12, 0x7a5a3a);
+
+    // Plateforme haute centrale
+    this.addPlatform(cx, gy - 240, 120, 12, 0x8a6a4a);
+
+    // Bounce pads pour traverser rapidement
+    this.createBouncePad(cx - 50, gy + 25, 40, 550);
+    this.createBouncePad(cx + 50, gy + 25, 40, 550);
+
+    // Moving platform au centre
+    this.createMovingPlatform(cx, gy - 160, 70, 12, { horizontal: true, distance: 150, speed: 100 });
   }
 
   spawnBoss() {
@@ -7202,6 +7367,22 @@ class GameScene extends Phaser.Scene {
       callbackScope: this,
       loop: true
     });
+
+    // NOUVEAU: Laser tournant (DANGEREUX) - Phase 2+
+    this.spinnerLaserTimer = this.time.addEvent({
+      delay: 8000,
+      callback: this.bossSpinnerLaser,
+      callbackScope: this,
+      loop: true
+    });
+
+    // NOUVEAU: Vortex (attire le joueur)
+    this.spinnerVortexTimer = this.time.addEvent({
+      delay: 10000,
+      callback: this.bossSpinnerVortex,
+      callbackScope: this,
+      loop: true
+    });
   }
 
   bossSpinnerDrift() {
@@ -7505,6 +7686,166 @@ class GameScene extends Phaser.Scene {
     this.spinnerAngle += 0.12; // Plus lent
   }
 
+  // === NOUVEAU: LASER TOURNANT (DANGEREUX) ===
+  bossSpinnerLaser() {
+    if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+    if (this.bossPhase < 2) return; // Seulement en phase 2+
+    if (this.spinnerState !== 'spinning') return;
+
+    this.spinnerState = 'laser';
+
+    // Telegraph
+    this.playSound('bossWarning');
+    this.boss.setFillStyle(0xff0000);
+
+    // Animation de charge
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.3,
+      scaleY: 1.3,
+      duration: 800,
+      ease: 'Quad.easeIn'
+    });
+
+    this.time.delayedCall(1000, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      this.boss.setFillStyle(this.bossColor);
+      this.playSound('laser');
+
+      // Créer le laser tournant
+      let laserAngle = 0;
+      const laserDuration = 3000;
+      const laserGraphics = this.add.graphics();
+      laserGraphics.setDepth(35);
+
+      const laserUpdate = this.time.addEvent({
+        delay: 16,
+        repeat: Math.floor(laserDuration / 16),
+        callback: () => {
+          if (!this.boss || !this.boss.active) {
+            laserGraphics.destroy();
+            return;
+          }
+
+          laserGraphics.clear();
+          laserGraphics.lineStyle(8, 0x00ffff, 0.8);
+          laserGraphics.beginPath();
+          laserGraphics.moveTo(this.boss.x, this.boss.y);
+          const laserLength = 500;
+          laserGraphics.lineTo(
+            this.boss.x + Math.cos(laserAngle) * laserLength,
+            this.boss.y + Math.sin(laserAngle) * laserLength
+          );
+          laserGraphics.strokePath();
+
+          // Vérifier collision avec joueur
+          if (this.player && this.player.active && !this.isInvincible) {
+            const px = this.player.x - this.boss.x;
+            const py = this.player.y - this.boss.y;
+            const dist = Math.sqrt(px * px + py * py);
+            const playerAngle = Math.atan2(py, px);
+            const angleDiff = Math.abs(Phaser.Math.Angle.Wrap(playerAngle - laserAngle));
+
+            if (dist < laserLength && angleDiff < 0.15) {
+              this.takeDamage(6); // 1.5 coeurs
+            }
+          }
+
+          laserAngle += 0.04; // Rotation du laser
+        }
+      });
+
+      // Fin du laser
+      this.time.delayedCall(laserDuration, () => {
+        laserGraphics.destroy();
+        this.tweens.add({
+          targets: this.boss,
+          scaleX: 1,
+          scaleY: 1,
+          duration: 300
+        });
+        this.spinnerState = 'spinning';
+      });
+    });
+  }
+
+  // === NOUVEAU: VORTEX (attire le joueur) ===
+  bossSpinnerVortex() {
+    if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+    if (this.spinnerState !== 'spinning') return;
+
+    this.spinnerState = 'vortex';
+
+    // Telegraph visuel
+    this.playSound('bossCharge');
+    const vortexGraphics = this.add.graphics();
+    vortexGraphics.setDepth(25);
+
+    // Animation de charge
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 0.7,
+      scaleY: 0.7,
+      duration: 500,
+      yoyo: true,
+      repeat: 1
+    });
+
+    // Effet visuel de vortex
+    let vortexRadius = 0;
+    const maxRadius = 200;
+    const vortexDuration = 2500;
+
+    const vortexUpdate = this.time.addEvent({
+      delay: 16,
+      repeat: Math.floor(vortexDuration / 16),
+      callback: () => {
+        if (!this.boss || !this.boss.active) {
+          vortexGraphics.destroy();
+          return;
+        }
+
+        vortexGraphics.clear();
+        vortexRadius = Math.min(vortexRadius + 3, maxRadius);
+
+        // Dessiner spirales
+        for (let i = 0; i < 3; i++) {
+          const baseAngle = (this.time.now * 0.005) + (i * Math.PI * 2 / 3);
+          vortexGraphics.lineStyle(2, 0x00ffff, 0.5);
+          vortexGraphics.beginPath();
+          for (let r = 20; r < vortexRadius; r += 10) {
+            const angle = baseAngle + r * 0.05;
+            vortexGraphics.lineTo(
+              this.boss.x + Math.cos(angle) * r,
+              this.boss.y + Math.sin(angle) * r
+            );
+          }
+          vortexGraphics.strokePath();
+        }
+
+        // Attirer le joueur
+        if (this.player && this.player.active && this.player.body) {
+          const dx = this.boss.x - this.player.x;
+          const dy = this.boss.y - this.player.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < vortexRadius && dist > 30) {
+            const pullStrength = 150 * (1 - dist / vortexRadius);
+            this.player.body.velocity.x += (dx / dist) * pullStrength * 0.02;
+            this.player.body.velocity.y += (dy / dist) * pullStrength * 0.02;
+          }
+        }
+      }
+    });
+
+    // Fin du vortex
+    this.time.delayedCall(vortexDuration, () => {
+      vortexGraphics.destroy();
+      this.spinnerState = 'spinning';
+    });
+  }
+
   // ==========================================
   // BOSS 3 : SPLITTER - Se divise en mini-boss
   // ==========================================
@@ -7539,6 +7880,14 @@ class GameScene extends Phaser.Scene {
     this.splitterSplitTimer = this.time.addEvent({
       delay: 7000,
       callback: this.bossSplitterWindUp,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer pour Blob Explosion (DANGEREUX - Phase 2+)
+    this.splitterExplosionTimer = this.time.addEvent({
+      delay: 9000,
+      callback: this.bossSplitterExplosion,
       callbackScope: this,
       loop: true
     });
@@ -7758,6 +8107,101 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  // === BLOB EXPLOSION (DANGEREUX - Phase 2+) ===
+  // Tire des projectiles dans TOUTES les directions - très difficile à éviter
+  bossSplitterExplosion() {
+    if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+    if (this.splitterState !== 'idle') return;
+    if (this.bossPhase < 2) return; // Phase 2+ seulement
+
+    this.splitterState = 'charging';
+
+    // === TELEGRAPH: Gonflement intense + couleur rouge ===
+    const originalColor = this.bossColor;
+    this.boss.setFillStyle(0xff4400); // Rouge danger
+
+    // Gonflement menaçant
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.8,
+      scaleY: 1.8,
+      duration: 1200,
+      ease: 'Quad.easeIn',
+      onUpdate: () => {
+        // Particules de charge rouge
+        if (Math.random() < 0.5) {
+          this.emitParticles(this.boss.x + (Math.random() - 0.5) * 60, this.boss.y + (Math.random() - 0.5) * 60, {
+            count: 3,
+            colors: [0xff4400, 0xff0000, 0xff6600],
+            minSpeed: 30,
+            maxSpeed: 80,
+            minSize: 4,
+            maxSize: 8,
+            life: 400,
+            fadeOut: true
+          });
+        }
+      }
+    });
+
+    // Flash d'avertissement
+    this.cameras.main.flash(200, 255, 100, 0, false);
+
+    // === EXPLOSION après telegraph ===
+    this.time.delayedCall(1300, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      // Contraction rapide
+      this.tweens.add({
+        targets: this.boss,
+        scaleX: 0.5,
+        scaleY: 0.5,
+        duration: 100,
+        ease: 'Quad.easeOut'
+      });
+
+      // === EXPLOSION: 12 projectiles en cercle ===
+      const numBullets = 12;
+      for (let i = 0; i < numBullets; i++) {
+        const angle = (i / numBullets) * Math.PI * 2;
+        this.createBossBullet(this.boss.x, this.boss.y, angle, 180);
+      }
+
+      // Particules d'explosion massive
+      this.emitParticles(this.boss.x, this.boss.y, {
+        count: 30,
+        colors: [0xff4400, 0xffff00, 0xff0000],
+        minSpeed: 100,
+        maxSpeed: 250,
+        minSize: 5,
+        maxSize: 12,
+        life: 500,
+        spread: Math.PI * 2,
+        fadeOut: true
+      });
+
+      // Shake
+      this.cameras.main.shake(200, 0.015);
+
+      // === RECOVERY: Boss vulnérable ===
+      this.splitterState = 'recovering';
+      this.boss.setFillStyle(0x888800); // Couleur fatiguée
+
+      this.time.delayedCall(1500, () => {
+        if (this.boss && this.boss.active) {
+          this.splitterState = 'idle';
+          this.boss.setFillStyle(originalColor);
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 300
+          });
+        }
+      });
+    });
+  }
+
   spawnSplitterMinion(x, y) {
     // Particules de division/spawn
     this.emitParticles(x, y, {
@@ -7874,6 +8318,14 @@ class GameScene extends Phaser.Scene {
     this.guardianSlamTimer = this.time.addEvent({
       delay: 6000,
       callback: this.bossGuardianSlamWindUp,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer Shield Bash (DANGEREUX - Phase 2+)
+    this.guardianBashTimer = this.time.addEvent({
+      delay: 8000,
+      callback: this.bossGuardianShieldBash,
       callbackScope: this,
       loop: true
     });
@@ -8243,6 +8695,155 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  // === SHIELD BASH (DANGEREUX - Phase 2+) ===
+  // Charge rapide avec bouclier devant - inflige gros dégâts
+  bossGuardianShieldBash() {
+    if (!this.boss || !this.boss.active) return;
+    if (!this.player || !this.player.active) return;
+    if (this.guardianState !== 'guarding' && this.guardianState !== 'vulnerable') return;
+    if (this.bossPhase < 2) return; // Phase 2+ seulement
+
+    this.guardianState = 'charging';
+
+    // Mémoriser direction vers le joueur
+    const toPlayerX = this.player.x - this.boss.x;
+    const dirX = toPlayerX > 0 ? 1 : -1;
+
+    // === TELEGRAPH: Bouclier brille + Recul ===
+    this.playSound('bossWarning');
+
+    // Bouclier devient rouge danger
+    if (this.guardianShieldSprite) {
+      this.guardianShieldSprite.setFillStyle(0xff4400, 0.5);
+      this.guardianShieldSprite.setStrokeStyle(4, 0xff0000);
+    }
+
+    // Recul avant charge
+    this.tweens.add({
+      targets: this.boss,
+      x: this.boss.x - dirX * 40,
+      scaleX: 0.8,
+      scaleY: 1.1,
+      duration: 600,
+      ease: 'Quad.easeOut',
+      onUpdate: () => {
+        // Particules d'énergie rouge
+        if (Math.random() < 0.4) {
+          this.emitParticles(this.boss.x + dirX * 30, this.boss.y, {
+            count: 3,
+            colors: [0xff4400, 0xff0000, 0xffaa00],
+            minSpeed: 50,
+            maxSpeed: 100,
+            minSize: 4,
+            maxSize: 8,
+            life: 300,
+            fadeOut: true
+          });
+        }
+      }
+    });
+
+    // Flash avertissement
+    this.cameras.main.flash(150, 255, 100, 0, false);
+
+    // === CHARGE après telegraph ===
+    this.time.delayedCall(700, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      this.guardianState = 'slamming';
+      this.playSound('dash');
+
+      // CHARGE RAPIDE!
+      this.tweens.add({
+        targets: this.boss,
+        x: this.boss.x + dirX * 350,
+        scaleX: 1.2,
+        scaleY: 0.9,
+        duration: 250,
+        ease: 'Quad.easeIn',
+        onUpdate: () => {
+          // Trainée de particules
+          this.emitParticles(this.boss.x - dirX * 20, this.boss.y, {
+            count: 2,
+            colors: [0xff4400, 0x0099ff],
+            minSpeed: 30,
+            maxSpeed: 60,
+            minSize: 3,
+            maxSize: 6,
+            life: 200,
+            fadeOut: true
+          });
+        },
+        onComplete: () => {
+          if (!this.boss || !this.boss.active) return;
+
+          // Impact!
+          this.cameras.main.shake(200, 0.02);
+
+          // Particules d'impact
+          this.emitParticles(this.boss.x + dirX * 25, this.boss.y, {
+            count: 20,
+            colors: [0xff4400, 0xffaa00, 0xffffff],
+            minSpeed: 80,
+            maxSpeed: 200,
+            minSize: 4,
+            maxSize: 10,
+            life: 400,
+            angle: dirX > 0 ? 0 : Math.PI,
+            spread: Math.PI / 2,
+            fadeOut: true
+          });
+
+          // Dégâts si le joueur est touché (zone devant le boss)
+          const hitZoneX = this.boss.x + dirX * 40;
+          const distToPlayer = Math.abs(this.player.x - hitZoneX) + Math.abs(this.player.y - this.boss.y);
+          if (distToPlayer < 80 && !this.isInvincible) {
+            this.takeDamage(8); // 2 coeurs - très dangereux!
+          }
+
+          // === RECOVERY: Boss coincé dans le mur ===
+          this.guardianState = 'recovering';
+
+          // Bouclier redevient normal mais fatigué
+          if (this.guardianShieldSprite) {
+            this.guardianShieldSprite.setFillStyle(0x003366, 0.2);
+            this.guardianShieldSprite.setStrokeStyle(2, 0x336699);
+          }
+
+          // Animation stuck
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 0.9,
+            scaleY: 1.05,
+            duration: 200,
+            yoyo: true,
+            repeat: 3
+          });
+
+          // Retour à normal après recovery
+          this.time.delayedCall(2000, () => {
+            if (this.boss && this.boss.active) {
+              this.guardianState = this.guardianShield ? 'guarding' : 'vulnerable';
+
+              // Bouclier normal
+              if (this.guardianShieldSprite) {
+                this.guardianShieldSprite.setFillStyle(0x0099ff, 0.3);
+                this.guardianShieldSprite.setStrokeStyle(3, 0x00ccff);
+              }
+
+              this.tweens.add({
+                targets: this.boss,
+                scaleX: 1,
+                scaleY: 1,
+                duration: 300
+              });
+            }
+          });
+        }
+      });
+    });
+  }
+
   // ==========================================
   // BOSS 5 : SUMMONER - Invoque des ennemis
   // ==========================================
@@ -8280,6 +8881,22 @@ class GameScene extends Phaser.Scene {
     this.bossShootTimer = this.time.addEvent({
       delay: 3000,
       callback: this.bossSummonerShoot,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer Dark Ritual (DANGEREUX - Phase 2+)
+    this.summonerRitualTimer = this.time.addEvent({
+      delay: 12000,
+      callback: this.bossSummonerDarkRitual,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer Mass Summon (DANGEREUX - Phase 3)
+    this.summonerMassSummonTimer = this.time.addEvent({
+      delay: 15000,
+      callback: this.bossSummonerMassSummon,
       callbackScope: this,
       loop: true
     });
@@ -8688,6 +9305,299 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  // === DARK RITUAL (DANGEREUX - Phase 2+) ===
+  // Zone de dégâts au sol qui force le joueur à sauter
+  bossSummonerDarkRitual() {
+    if (!this.boss || !this.boss.active) return;
+    if (this.summonerState !== 'drifting') return;
+    if (this.bossPhase < 2) return; // Phase 2+ seulement
+
+    this.summonerState = 'channeling';
+    this.playSound('bossWarning');
+
+    // === TELEGRAPH: Symboles magiques au sol ===
+    const ritualZones = [];
+    const numZones = 3;
+
+    for (let i = 0; i < numZones; i++) {
+      const zoneX = 150 + (i * (this.WORLD.width - 300) / (numZones - 1));
+      const zoneY = this.WORLD.groundY - 20;
+
+      // Cercle d'avertissement
+      const warning = this.add.circle(zoneX, zoneY, 60, 0xff00ff, 0.2);
+      warning.setStrokeStyle(3, 0xff00ff);
+      warning.setDepth(5);
+      ritualZones.push({ x: zoneX, y: zoneY, warning });
+
+      // Animation pulsante
+      this.tweens.add({
+        targets: warning,
+        alpha: 0.6,
+        scaleX: 1.2,
+        scaleY: 1.2,
+        duration: 300,
+        yoyo: true,
+        repeat: 4
+      });
+    }
+
+    // Boss lève les bras
+    this.tweens.add({
+      targets: this.boss,
+      y: this.boss.y - 30,
+      scaleY: 1.3,
+      duration: 1500,
+      ease: 'Quad.easeIn',
+      onUpdate: () => {
+        if (Math.random() < 0.3) {
+          this.emitParticles(this.boss.x + (Math.random() - 0.5) * 40, this.boss.y + 30, {
+            count: 2,
+            colors: [0xff00ff, 0x9900ff, 0xff0099],
+            minSpeed: 40,
+            maxSpeed: 80,
+            minSize: 3,
+            maxSize: 6,
+            life: 400,
+            angle: Math.PI / 2,
+            spread: 0.5,
+            fadeOut: true
+          });
+        }
+      }
+    });
+
+    // Flash
+    this.cameras.main.flash(200, 150, 0, 200, false);
+
+    // === ACTIVATION après telegraph ===
+    this.time.delayedCall(1600, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      ritualZones.forEach(zone => {
+        zone.warning.destroy();
+
+        // Zone de dégâts active
+        const damageZone = this.add.circle(zone.x, zone.y, 70, 0xff0066, 0.5);
+        damageZone.setStrokeStyle(4, 0xff0000);
+        damageZone.setDepth(5);
+
+        // Flammes qui montent
+        const flameTimer = this.time.addEvent({
+          delay: 100,
+          callback: () => {
+            this.emitParticles(zone.x + (Math.random() - 0.5) * 80, zone.y - 20, {
+              count: 3,
+              colors: [0xff0066, 0xff00ff, 0xff3399],
+              minSpeed: 60,
+              maxSpeed: 120,
+              minSize: 4,
+              maxSize: 10,
+              life: 400,
+              angle: -Math.PI / 2,
+              spread: 0.4,
+              fadeOut: true
+            });
+          },
+          repeat: 20
+        });
+
+        // Vérification dégâts
+        const damageTimer = this.time.addEvent({
+          delay: 200,
+          callback: () => {
+            if (!this.player || !this.player.active) return;
+            const dist = Math.sqrt(
+              Math.pow(this.player.x - zone.x, 2) +
+              Math.pow(this.player.y - zone.y, 2)
+            );
+            if (dist < 70 && !this.isInvincible) {
+              this.takeDamage(4); // 1 coeur par tick
+            }
+          },
+          repeat: 10
+        });
+
+        // Disparition
+        this.time.delayedCall(2200, () => {
+          this.tweens.add({
+            targets: damageZone,
+            alpha: 0,
+            duration: 300,
+            onComplete: () => damageZone.destroy()
+          });
+        });
+      });
+
+      // Shake
+      this.cameras.main.shake(300, 0.015);
+
+      // === RECOVERY ===
+      this.summonerState = 'recovering';
+      this.boss.setAlpha(0.6);
+
+      this.time.delayedCall(2500, () => {
+        if (this.boss && this.boss.active) {
+          this.summonerState = 'drifting';
+          this.boss.setAlpha(1);
+          this.tweens.add({
+            targets: this.boss,
+            scaleY: 1,
+            y: 150,
+            duration: 400
+          });
+        }
+      });
+    });
+  }
+
+  // === MASS SUMMON (DANGEREUX - Phase 3) ===
+  // Invoque 4 ennemis d'un coup - submersion
+  bossSummonerMassSummon() {
+    if (!this.boss || !this.boss.active) return;
+    if (this.summonerState !== 'drifting') return;
+    if (this.bossPhase < 3) return; // Phase 3 seulement
+
+    // Nettoie les ennemis inactifs
+    this.summonedEnemies = this.summonedEnemies.filter(e => e && e.active);
+    if (this.summonedEnemies.length >= 3) return; // Pas si déjà beaucoup
+
+    this.summonerState = 'channeling';
+    this.playSound('bossWarning');
+    this.playSound('bossCharge');
+
+    // === MEGA TELEGRAPH ===
+    const originalColor = this.bossColor;
+    this.boss.setFillStyle(0xff0000); // Rouge danger
+
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.8,
+      scaleY: 1.8,
+      duration: 2000,
+      ease: 'Quad.easeIn',
+      onUpdate: () => {
+        // Cercle de particules qui grandit
+        if (Math.random() < 0.6) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 100;
+          this.emitParticles(
+            this.boss.x + Math.cos(angle) * dist,
+            this.boss.y + Math.sin(angle) * dist,
+            {
+              count: 2,
+              colors: [0xff0000, 0xff00ff, 0xaa0000],
+              minSpeed: 80,
+              maxSpeed: 150,
+              minSize: 4,
+              maxSize: 8,
+              life: 500,
+              angle: angle + Math.PI,
+              spread: 0.3,
+              fadeOut: true
+            }
+          );
+        }
+      }
+    });
+
+    // Flash intense
+    this.cameras.main.flash(300, 255, 0, 100, false);
+
+    // === MASS SUMMON! ===
+    this.time.delayedCall(2100, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      // Explosion visuelle
+      this.emitParticles(this.boss.x, this.boss.y, {
+        count: 50,
+        colors: [0xff00ff, 0xff0000, 0xffffff],
+        minSpeed: 150,
+        maxSpeed: 300,
+        minSize: 5,
+        maxSize: 15,
+        life: 600,
+        spread: Math.PI * 2,
+        fadeOut: true
+      });
+
+      this.cameras.main.shake(400, 0.025);
+
+      // Spawn 4 ennemis aux coins
+      const spawnPositions = [
+        { x: 150, y: 150 },
+        { x: this.WORLD.width - 150, y: 150 },
+        { x: 200, y: 250 },
+        { x: this.WORLD.width - 200, y: 250 }
+      ];
+
+      spawnPositions.forEach((pos, i) => {
+        this.time.delayedCall(i * 200, () => {
+          if (!this.boss || !this.boss.active) return;
+          if (!this.player || !this.player.active) return;
+
+          // Portail
+          this.emitParticles(pos.x, pos.y, {
+            count: 20,
+            colors: [0xff0099, 0xff00ff],
+            minSpeed: 60,
+            maxSpeed: 120,
+            minSize: 4,
+            maxSize: 8,
+            life: 300,
+            spread: Math.PI * 2,
+            fadeOut: true
+          });
+
+          const enemy = this.add.rectangle(pos.x, pos.y, 25, 25, 0xff2244);
+          enemy.setStrokeStyle(2, 0xaa0022);
+          this.physics.add.existing(enemy);
+          enemy.body.setGravityY(this.config.gravity);
+          enemy.body.setCollideWorldBounds(true);
+          enemy.body.setVelocityX(Phaser.Math.Between(-100, 100));
+
+          enemy.setAlpha(0);
+          enemy.setScale(0);
+          this.tweens.add({
+            targets: enemy,
+            alpha: 1, scaleX: 1, scaleY: 1,
+            duration: 250,
+            ease: 'Back.easeOut'
+          });
+
+          this.summonedEnemies.push(enemy);
+          this.physics.add.collider(enemy, this.platforms);
+          this.physics.add.overlap(this.player, enemy, (p, e) => this.hitSummonedEnemy(p, e), null, this);
+        });
+      });
+
+      // === LONG RECOVERY - TRÈS vulnérable ===
+      this.boss.setFillStyle(0x660066); // Épuisé
+      this.summonerState = 'recovering';
+
+      this.tweens.add({
+        targets: this.boss,
+        scaleX: 0.7,
+        scaleY: 0.7,
+        alpha: 0.5,
+        duration: 300
+      });
+
+      this.time.delayedCall(3000, () => {
+        if (this.boss && this.boss.active) {
+          this.summonerState = 'drifting';
+          this.boss.setFillStyle(originalColor);
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 1,
+            scaleY: 1,
+            alpha: 1,
+            duration: 400
+          });
+        }
+      });
+    });
+  }
+
   // ==========================================
   // BOSS 6 : CRUSHER - Écraseur gravitationnel
   // ==========================================
@@ -8721,6 +9631,22 @@ class GameScene extends Phaser.Scene {
     this.crusherRockTimer = this.time.addEvent({
       delay: 3000,
       callback: this.bossCrusherThrowRock,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer Meteor Rain (DANGEREUX - Phase 2+)
+    this.crusherMeteorTimer = this.time.addEvent({
+      delay: 8000,
+      callback: this.bossCrusherMeteorRain,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer Ground Combo (DANGEREUX - Phase 3)
+    this.crusherComboTimer = this.time.addEvent({
+      delay: 10000,
+      callback: this.bossCrusherGroundCombo,
       callbackScope: this,
       loop: true
     });
@@ -8946,6 +9872,276 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  // === METEOR RAIN (DANGEREUX - Phase 2+) ===
+  // Pluie de rochers du ciel - zones multiples
+  bossCrusherMeteorRain() {
+    if (!this.boss || !this.boss.active || this.crusherSlamming) return;
+    if (this.bossPhase < 2) return; // Phase 2+ seulement
+
+    this.crusherSlamming = true; // Bloque autres attaques
+    this.playSound('bossWarning');
+
+    // === TELEGRAPH: Boss lève les bras ===
+    this.tweens.add({
+      targets: this.boss,
+      y: this.boss.y - 40,
+      scaleX: 1.3,
+      scaleY: 1.3,
+      duration: 800,
+      ease: 'Quad.easeIn'
+    });
+
+    // Avertissements au sol
+    const meteorCount = 5;
+    const warnings = [];
+    for (let i = 0; i < meteorCount; i++) {
+      const targetX = 100 + Math.random() * (this.WORLD.width - 200);
+      const warning = this.add.ellipse(targetX, this.WORLD.groundY - 10, 60, 20, 0xff4400, 0.3);
+      warning.setStrokeStyle(2, 0xff0000);
+      warning.setDepth(5);
+      warnings.push({ x: targetX, warning });
+
+      // Animation pulsante
+      this.tweens.add({
+        targets: warning,
+        alpha: 0.7,
+        scaleX: 1.3,
+        scaleY: 1.3,
+        duration: 200,
+        yoyo: true,
+        repeat: 4
+      });
+    }
+
+    // Flash
+    this.cameras.main.flash(200, 255, 100, 0, false);
+
+    // === METEORS FALL ===
+    this.time.delayedCall(1000, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      warnings.forEach((w, index) => {
+        w.warning.destroy();
+
+        this.time.delayedCall(index * 200, () => {
+          // Meteor tombe du ciel
+          const meteor = this.add.circle(w.x, -50, 25, 0xff4400);
+          meteor.setStrokeStyle(4, 0xffaa00);
+          this.physics.add.existing(meteor);
+          meteor.body.setAllowGravity(false);
+          meteor.body.setVelocity(0, 400);
+
+          // Trainée de feu
+          const trailTimer = this.time.addEvent({
+            delay: 50,
+            callback: () => {
+              if (meteor.active) {
+                this.emitParticles(meteor.x, meteor.y, {
+                  count: 2,
+                  colors: [0xff4400, 0xffaa00, 0xff0000],
+                  minSpeed: 20,
+                  maxSpeed: 50,
+                  minSize: 4,
+                  maxSize: 8,
+                  life: 300,
+                  angle: -Math.PI / 2,
+                  spread: 0.5,
+                  fadeOut: true
+                });
+              }
+            },
+            repeat: 20
+          });
+
+          // Impact au sol
+          this.time.delayedCall(700, () => {
+            if (!meteor.active) return;
+
+            // Explosion
+            this.emitParticles(w.x, this.WORLD.groundY - 20, {
+              count: 25,
+              colors: [0xff4400, 0xffaa00, 0x884422],
+              minSpeed: 100,
+              maxSpeed: 250,
+              minSize: 5,
+              maxSize: 12,
+              life: 500,
+              angle: -Math.PI / 2,
+              spread: Math.PI * 0.8,
+              gravity: 300,
+              fadeOut: true
+            });
+
+            // Shake
+            this.cameras.main.shake(150, 0.015);
+
+            // Zone de dégâts
+            if (this.player && this.player.active) {
+              const dist = Math.abs(this.player.x - w.x);
+              if (dist < 60 && !this.isInvincible) {
+                this.takeDamage(6); // 1.5 coeurs par meteor
+              }
+            }
+
+            meteor.destroy();
+          });
+        });
+      });
+
+      // Recovery
+      this.time.delayedCall(1500, () => {
+        if (this.boss && this.boss.active) {
+          this.tweens.add({
+            targets: this.boss,
+            y: 160,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 500,
+            onComplete: () => {
+              this.crusherSlamming = false;
+            }
+          });
+        }
+      });
+    });
+  }
+
+  // === GROUND COMBO (DANGEREUX - Phase 3) ===
+  // Triple slam rapide - très difficile à éviter
+  bossCrusherGroundCombo() {
+    if (!this.boss || !this.boss.active || this.crusherSlamming) return;
+    if (this.bossPhase < 3) return; // Phase 3 seulement
+
+    this.crusherSlamming = true;
+    this.boss.body.setCollideWorldBounds(false);
+
+    this.playSound('bossWarning');
+    this.playSound('bossCharge');
+
+    // Flash rouge danger
+    this.cameras.main.flash(300, 255, 0, 0, false);
+
+    // Boss devient rouge
+    const originalColor = this.bossColor;
+    this.boss.setFillStyle(0xff2200);
+
+    let comboCount = 0;
+    const maxCombo = 3;
+
+    const doComboSlam = () => {
+      if (!this.boss || !this.boss.active) return;
+      if (comboCount >= maxCombo) {
+        // Fin du combo - LONG recovery
+        this.boss.setFillStyle(0x442211); // Épuisé
+        this.tweens.add({
+          targets: this.boss,
+          y: 160,
+          scaleX: 0.8,
+          scaleY: 0.8,
+          duration: 300
+        });
+
+        // Particules de fatigue
+        const exhaustTimer = this.time.addEvent({
+          delay: 100,
+          callback: () => {
+            if (this.boss && this.boss.active) {
+              this.emitParticles(this.boss.x + (Math.random() - 0.5) * 40, this.boss.y, {
+                count: 2,
+                colors: [0x884422, 0x553311],
+                minSpeed: 10,
+                maxSpeed: 30,
+                minSize: 3,
+                maxSize: 6,
+                life: 400,
+                angle: -Math.PI / 2,
+                spread: 0.5,
+                fadeOut: true
+              });
+            }
+          },
+          repeat: 20
+        });
+
+        this.time.delayedCall(2500, () => {
+          if (this.boss && this.boss.active) {
+            this.boss.setFillStyle(originalColor);
+            this.boss.body.setCollideWorldBounds(true);
+            this.tweens.add({
+              targets: this.boss,
+              scaleX: 1,
+              scaleY: 1,
+              duration: 300,
+              onComplete: () => {
+                this.crusherSlamming = false;
+              }
+            });
+          }
+        });
+        return;
+      }
+
+      comboCount++;
+
+      // Tracking rapide vers le joueur
+      const targetX = this.player && this.player.active ? this.player.x : this.boss.x;
+
+      // Quick rise + move
+      this.tweens.add({
+        targets: this.boss,
+        x: targetX,
+        y: 120,
+        scaleX: 0.9,
+        scaleY: 1.2,
+        duration: 250,
+        ease: 'Quad.easeOut',
+        onComplete: () => {
+          if (!this.boss || !this.boss.active) return;
+
+          // SLAM!
+          this.tweens.add({
+            targets: this.boss,
+            y: this.WORLD.groundY - 50,
+            scaleX: 1.5,
+            scaleY: 0.5,
+            duration: 100,
+            ease: 'Quad.easeIn',
+            onComplete: () => {
+              if (!this.boss || !this.boss.active) return;
+
+              this.playSound('bossSlam');
+              this.cameras.main.shake(300, 0.03);
+
+              // Onde de choc
+              this.createCrusherShockwave(this.boss.x, this.WORLD.groundY);
+
+              // Particules
+              this.emitParticles(this.boss.x, this.WORLD.groundY - 10, {
+                count: 30,
+                colors: [0xff4422, 0xff2200, 0xffaa00],
+                minSpeed: 150,
+                maxSpeed: 300,
+                minSize: 5,
+                maxSize: 12,
+                life: 500,
+                angle: -Math.PI / 2,
+                spread: Math.PI * 0.8,
+                gravity: 350,
+                fadeOut: true
+              });
+
+              // Prochain slam après court délai
+              this.time.delayedCall(400, doComboSlam);
+            }
+          });
+        }
+      });
+    };
+
+    // Début du combo
+    doComboSlam();
+  }
+
   // ==========================================
   // BOSS 7 : PHANTOM - Maître des illusions
   // ==========================================
@@ -8988,6 +10184,14 @@ class GameScene extends Phaser.Scene {
     this.phantomShootTimer = this.time.addEvent({
       delay: 2000,
       callback: this.bossPhantomShoot,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer Phase Strike (DANGEREUX - Phase 2+)
+    this.phantomPhaseStrikeTimer = this.time.addEvent({
+      delay: 7000,
+      callback: this.bossPhantomPhaseStrike,
       callbackScope: this,
       loop: true
     });
@@ -9215,6 +10419,160 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  // === PHASE STRIKE (DANGEREUX - Phase 2+) ===
+  // Téléportation rapide vers le joueur + frappe instantanée
+  bossPhantomPhaseStrike() {
+    if (!this.boss || !this.boss.active) return;
+    if (!this.player || !this.player.active) return;
+    if (this.bossPhase < 2) return; // Phase 2+ seulement
+
+    this.playSound('bossWarning');
+
+    // === TELEGRAPH: Boss devient invisible + ligne d'attaque ===
+    const targetX = this.player.x;
+    const targetY = this.player.y;
+
+    // Ligne d'avertissement entre boss et joueur
+    const warningLine = this.add.line(
+      0, 0,
+      this.boss.x, this.boss.y,
+      targetX, targetY,
+      0xff00ff
+    ).setLineWidth(3).setAlpha(0.5).setDepth(50);
+
+    // Animation pulsante de la ligne
+    this.tweens.add({
+      targets: warningLine,
+      alpha: 1,
+      duration: 150,
+      yoyo: true,
+      repeat: 3
+    });
+
+    // Boss clignote
+    this.tweens.add({
+      targets: this.boss,
+      alpha: { from: 0.8, to: 0.2 },
+      duration: 100,
+      yoyo: true,
+      repeat: 4
+    });
+
+    // Particules de charge spectrale
+    const chargeTimer = this.time.addEvent({
+      delay: 100,
+      repeat: 8,
+      callback: () => {
+        if (this.boss && this.boss.active) {
+          this.emitParticles(this.boss.x + (Math.random() - 0.5) * 60, this.boss.y + (Math.random() - 0.5) * 60, {
+            count: 3,
+            colors: [0xff00ff, 0x9933ff, 0xffffff],
+            minSpeed: 80,
+            maxSpeed: 150,
+            minSize: 3,
+            maxSize: 7,
+            life: 300,
+            fadeOut: true
+          });
+        }
+      }
+    });
+
+    // === PHASE STRIKE après telegraph ===
+    this.time.delayedCall(900, () => {
+      if (!this.boss || !this.boss.active) return;
+      if (!this.player || !this.player.active) return;
+
+      warningLine.destroy();
+
+      // Mémoriser position actuelle de la cible
+      const strikeX = this.player.x;
+      const strikeY = this.player.y;
+
+      // Disparition instantanée
+      this.boss.setAlpha(0);
+      this.emitParticles(this.boss.x, this.boss.y, {
+        count: 20,
+        colors: [0x9933ff, 0x6600aa],
+        minSpeed: 100,
+        maxSpeed: 200,
+        minSize: 4,
+        maxSize: 8,
+        life: 300,
+        spread: Math.PI * 2,
+        fadeOut: true
+      });
+
+      // Téléportation à côté du joueur
+      this.time.delayedCall(100, () => {
+        if (!this.boss || !this.boss.active) return;
+
+        // Apparition derrière le joueur
+        const offsetX = (Math.random() > 0.5 ? 1 : -1) * 50;
+        this.boss.x = strikeX + offsetX;
+        this.boss.y = strikeY;
+
+        // STRIKE! Zone de dégâts autour du boss
+        this.boss.setAlpha(1);
+
+        // Slash visuel
+        const slash = this.add.ellipse(this.boss.x - offsetX * 0.5, this.boss.y, 120, 40, 0xff00ff, 0.7);
+        slash.setStrokeStyle(4, 0xffffff);
+        slash.setAngle(offsetX > 0 ? -30 : 30);
+        slash.setDepth(51);
+
+        this.tweens.add({
+          targets: slash,
+          alpha: 0,
+          scaleX: 1.5,
+          scaleY: 0.5,
+          duration: 200,
+          onComplete: () => slash.destroy()
+        });
+
+        // Particules de slash
+        this.emitParticles(this.boss.x, this.boss.y, {
+          count: 30,
+          colors: [0xff00ff, 0xcc66ff, 0xffffff],
+          minSpeed: 150,
+          maxSpeed: 300,
+          minSize: 4,
+          maxSize: 10,
+          life: 400,
+          angle: offsetX > 0 ? Math.PI : 0,
+          spread: Math.PI / 2,
+          fadeOut: true
+        });
+
+        // Dégâts si le joueur est dans la zone
+        if (this.player && this.player.active) {
+          const dist = Math.sqrt(
+            Math.pow(this.player.x - this.boss.x, 2) +
+            Math.pow(this.player.y - this.boss.y, 2)
+          );
+          if (dist < 80 && !this.isInvincible) {
+            this.takeDamage(8); // Phase Strike = 2 coeurs - TRÈS dangereux
+          }
+        }
+
+        // Camera shake
+        this.cameras.main.shake(200, 0.02);
+        this.playSound('bossSlam');
+
+        // Retour à l'état normal (semi-transparent)
+        this.time.delayedCall(300, () => {
+          if (this.boss && this.boss.active) {
+            this.tweens.add({
+              targets: this.boss,
+              alpha: 0.8,
+              duration: 200
+            });
+          }
+        });
+      });
+    });
+  }
+
   // ==========================================
   // BOSS 8 : BERSERKER - Rage incontrôlable
   // ==========================================
@@ -9248,6 +10606,22 @@ class GameScene extends Phaser.Scene {
     this.berserkerSlamTimer = this.time.addEvent({
       delay: 4500,
       callback: this.bossBerserkerGroundSlam,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer Rage Explosion (DANGEREUX - Phase 2+)
+    this.berserkerExplosionTimer = this.time.addEvent({
+      delay: 8000,
+      callback: this.bossBerserkerRageExplosion,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer Blood Frenzy (DANGEREUX - Phase 3)
+    this.berserkerFrenzyTimer = this.time.addEvent({
+      delay: 12000,
+      callback: this.bossBerserkerBloodFrenzy,
       callbackScope: this,
       loop: true
     });
@@ -9420,6 +10794,248 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  // === RAGE EXPLOSION (DANGEREUX - Phase 2+) ===
+  // Explosion de rage: projectiles dans TOUTES les directions
+  bossBerserkerRageExplosion() {
+    if (!this.boss || !this.boss.active || this.berserkerCharging) return;
+    if (this.bossPhase < 2) return; // Phase 2+ seulement
+
+    this.berserkerCharging = true;
+    this.playSound('bossWarning');
+    this.playSound('bossCharge');
+
+    // === TELEGRAPH: Boss devient rouge intense ===
+    const originalColor = this.bossColor;
+    this.boss.setFillStyle(0xff0000);
+
+    // Gonflement de rage
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.6,
+      scaleY: 1.6,
+      duration: 1200,
+      ease: 'Quad.easeIn',
+      onUpdate: () => {
+        // Particules de rage qui affluent
+        if (Math.random() < 0.5) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 80;
+          this.emitParticles(
+            this.boss.x + Math.cos(angle) * dist,
+            this.boss.y + Math.sin(angle) * dist,
+            {
+              count: 2,
+              colors: [0xff0000, 0xff3300, 0xffaa00],
+              minSpeed: 60,
+              maxSpeed: 120,
+              minSize: 4,
+              maxSize: 8,
+              life: 400,
+              angle: angle + Math.PI,
+              spread: 0.3,
+              fadeOut: true
+            }
+          );
+        }
+      }
+    });
+
+    // Shake croissant
+    this.cameras.main.shake(1200, 0.01);
+
+    // Flash rouge
+    this.cameras.main.flash(300, 255, 0, 0, false);
+
+    // === EXPLOSION! ===
+    this.time.delayedCall(1300, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      // Contraction rapide
+      this.tweens.add({
+        targets: this.boss,
+        scaleX: 0.5,
+        scaleY: 0.5,
+        duration: 100
+      });
+
+      // Projectiles en cercle (16 directions)
+      const numBullets = 16;
+      for (let i = 0; i < numBullets; i++) {
+        const angle = (i / numBullets) * Math.PI * 2;
+        this.createBossBullet(this.boss.x, this.boss.y, angle, 200);
+      }
+
+      // Deuxième vague plus lente
+      this.time.delayedCall(300, () => {
+        if (this.boss && this.boss.active) {
+          for (let i = 0; i < numBullets; i++) {
+            const angle = (i / numBullets) * Math.PI * 2 + Math.PI / 16; // Décalé
+            this.createBossBullet(this.boss.x, this.boss.y, angle, 140);
+          }
+        }
+      });
+
+      // Particules d'explosion massive
+      this.emitParticles(this.boss.x, this.boss.y, {
+        count: 50,
+        colors: [0xff0000, 0xff3300, 0xffaa00, 0xffffff],
+        minSpeed: 150,
+        maxSpeed: 350,
+        minSize: 5,
+        maxSize: 15,
+        life: 600,
+        spread: Math.PI * 2,
+        fadeOut: true
+      });
+
+      // Gros shake
+      this.cameras.main.shake(400, 0.035);
+      this.playSound('bossSlam');
+
+      // === RECOVERY: Épuisé ===
+      this.boss.setFillStyle(0x660000);
+
+      this.time.delayedCall(2000, () => {
+        if (this.boss && this.boss.active) {
+          this.berserkerCharging = false;
+          this.boss.setFillStyle(originalColor);
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 300
+          });
+        }
+      });
+    });
+  }
+
+  // === BLOOD FRENZY (DANGEREUX - Phase 3) ===
+  // Triple charge ultra-rapide avec traînée de feu
+  bossBerserkerBloodFrenzy() {
+    if (!this.boss || !this.boss.active || this.berserkerCharging) return;
+    if (this.bossPhase < 3) return; // Phase 3 seulement
+
+    this.berserkerCharging = true;
+    this.playSound('bossWarning');
+
+    // === MEGA TELEGRAPH: Boss hurle ===
+    const originalColor = this.bossColor;
+    this.boss.setFillStyle(0xcc0000);
+
+    // Animation de hurlement
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.4,
+      scaleY: 0.8,
+      duration: 600,
+      yoyo: true,
+      ease: 'Quad.easeOut'
+    });
+
+    // Cercle d'aura de rage
+    const aura = this.add.circle(this.boss.x, this.boss.y, 60, 0xff0000, 0.3);
+    aura.setStrokeStyle(4, 0xff3300);
+    aura.setDepth(5);
+
+    this.tweens.add({
+      targets: aura,
+      scaleX: 2,
+      scaleY: 2,
+      alpha: 0,
+      duration: 800,
+      onComplete: () => aura.destroy()
+    });
+
+    // Flash
+    this.cameras.main.flash(400, 200, 0, 0, false);
+
+    let chargeCount = 0;
+    const maxCharges = 3;
+
+    const doFrenzyCharge = () => {
+      if (!this.boss || !this.boss.active) return;
+      if (!this.player || !this.player.active) return;
+      if (chargeCount >= maxCharges) {
+        // Fin de la frénésie - ÉPUISÉ
+        this.boss.setFillStyle(0x440000);
+        this.tweens.add({
+          targets: this.boss,
+          scaleX: 0.8,
+          scaleY: 0.8,
+          alpha: 0.7,
+          duration: 200
+        });
+
+        // Long recovery
+        this.time.delayedCall(3000, () => {
+          if (this.boss && this.boss.active) {
+            this.berserkerCharging = false;
+            this.boss.setFillStyle(originalColor);
+            this.tweens.add({
+              targets: this.boss,
+              scaleX: 1,
+              scaleY: 1,
+              alpha: 1,
+              duration: 400
+            });
+          }
+        });
+        return;
+      }
+
+      chargeCount++;
+
+      // Direction vers le joueur
+      const toPlayerX = this.player.x - this.boss.x;
+      const toPlayerY = this.player.y - this.boss.y;
+      const dist = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
+
+      // Charge ULTRA rapide
+      const chargeSpeed = 700;
+      this.bossLunge(toPlayerX / dist, toPlayerY / dist * 0.5, chargeSpeed);
+
+      // Traînée de flammes
+      const trailTimer = this.time.addEvent({
+        delay: 30,
+        repeat: 15,
+        callback: () => {
+          if (this.boss && this.boss.active) {
+            // Flammes derrière
+            this.emitParticles(this.boss.x, this.boss.y, {
+              count: 5,
+              colors: [0xff0000, 0xff3300, 0xff6600, 0xffaa00],
+              minSpeed: 50,
+              maxSpeed: 120,
+              minSize: 5,
+              maxSize: 12,
+              life: 400,
+              spread: Math.PI,
+              fadeOut: true
+            });
+
+            // Zone de dégâts de la traînée
+            if (this.player && this.player.active && !this.isInvincible) {
+              const hitDist = Math.sqrt(
+                Math.pow(this.player.x - this.boss.x, 2) +
+                Math.pow(this.player.y - this.boss.y, 2)
+              );
+              if (hitDist < 50) {
+                this.takeDamage(6); // Touché par la charge = 1.5 coeurs
+              }
+            }
+          }
+        }
+      });
+
+      // Prochaine charge après pause
+      this.time.delayedCall(600, doFrenzyCharge);
+    };
+
+    // Début de la frénésie après telegraph
+    this.time.delayedCall(800, doFrenzyCharge);
+  }
+
   // ==========================================
   // BOSS 9 : ARCHITECT - Maître de l'arène
   // ==========================================
@@ -9453,6 +11069,22 @@ class GameScene extends Phaser.Scene {
     this.architectLaserTimer = this.time.addEvent({
       delay: 3000,
       callback: this.bossArchitectLaser,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer Blueprint Trap (DANGEREUX - Phase 2+)
+    this.architectTrapTimer = this.time.addEvent({
+      delay: 7000,
+      callback: this.bossArchitectBlueprintTrap,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer Overload (DANGEREUX - Phase 3)
+    this.architectOverloadTimer = this.time.addEvent({
+      delay: 10000,
+      callback: this.bossArchitectOverload,
       callbackScope: this,
       loop: true
     });
@@ -9696,6 +11328,306 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  // === BLUEPRINT TRAP (DANGEREUX - Phase 2+) ===
+  // Crée un piège invisible qui s'active quand le joueur passe dessus
+  bossArchitectBlueprintTrap() {
+    if (!this.boss || !this.boss.active) return;
+    if (!this.player || !this.player.active) return;
+    if (this.bossPhase < 2) return; // Phase 2+ seulement
+
+    this.playSound('bossWarning');
+
+    // === TELEGRAPH: Boss projette un blueprint ===
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.2,
+      scaleY: 0.8,
+      duration: 400,
+      yoyo: true
+    });
+
+    // Positions de pièges (là où le joueur pourrait aller)
+    const trapPositions = [
+      { x: this.player.x - 80, y: this.WORLD.groundY - 30 },
+      { x: this.player.x + 80, y: this.WORLD.groundY - 30 },
+      { x: this.player.x, y: this.WORLD.groundY - 30 }
+    ];
+
+    // Marques de blueprint visibles
+    const blueprints = [];
+    trapPositions.forEach((pos, i) => {
+      this.time.delayedCall(i * 200, () => {
+        const blueprint = this.add.rectangle(pos.x, pos.y, 50, 10, 0x00ff00, 0.2);
+        blueprint.setStrokeStyle(2, 0x00ff44);
+        blueprint.setDepth(5);
+        blueprints.push({ x: pos.x, y: pos.y, visual: blueprint });
+
+        // Animation de construction
+        this.tweens.add({
+          targets: blueprint,
+          alpha: 0.4,
+          duration: 200,
+          yoyo: true,
+          repeat: 2
+        });
+      });
+    });
+
+    // === ACTIVATION des pièges après délai ===
+    this.time.delayedCall(1000, () => {
+      blueprints.forEach(bp => {
+        bp.visual.destroy();
+
+        // Piège invisible mais actif
+        const trap = {
+          x: bp.x,
+          y: bp.y,
+          width: 60,
+          active: true
+        };
+
+        // Vérification périodique si joueur marche dessus
+        const trapCheck = this.time.addEvent({
+          delay: 100,
+          repeat: 50, // 5 secondes
+          callback: () => {
+            if (!trap.active) return;
+            if (!this.player || !this.player.active || this.isInvincible) return;
+
+            const playerOnGround = this.player.body.blocked.down || this.player.body.touching.down;
+            const inTrapX = Math.abs(this.player.x - trap.x) < trap.width / 2;
+            const inTrapY = Math.abs(this.player.y - trap.y) < 40;
+
+            if (playerOnGround && inTrapX && inTrapY) {
+              trap.active = false;
+
+              // ACTIVATION du piège!
+              // Spikes qui sortent du sol
+              const spikes = this.add.polygon(trap.x, trap.y - 10, [
+                -25, 15, -15, -15, -5, 15, 5, 15, 15, -15, 25, 15
+              ], 0x00ff44);
+              spikes.setStrokeStyle(2, 0xffffff);
+              spikes.setDepth(10);
+
+              // Animation de sortie
+              spikes.setScale(0.1, 0.1);
+              this.tweens.add({
+                targets: spikes,
+                scaleX: 1.2,
+                scaleY: 1.2,
+                duration: 100,
+                onComplete: () => {
+                  // Dégâts!
+                  if (this.player && this.player.active && !this.isInvincible) {
+                    const stillInTrap = Math.abs(this.player.x - trap.x) < trap.width / 2 + 10;
+                    if (stillInTrap) {
+                      this.takeDamage(6); // 1.5 coeurs
+                    }
+                  }
+
+                  // Disparition après coup
+                  this.time.delayedCall(500, () => {
+                    this.tweens.add({
+                      targets: spikes,
+                      scaleY: 0,
+                      alpha: 0,
+                      duration: 200,
+                      onComplete: () => spikes.destroy()
+                    });
+                  });
+                }
+              });
+
+              // Particules
+              this.emitParticles(trap.x, trap.y, {
+                count: 20,
+                colors: [0x00ff44, 0x00ff00, 0xffffff],
+                minSpeed: 100,
+                maxSpeed: 200,
+                minSize: 3,
+                maxSize: 8,
+                life: 400,
+                angle: -Math.PI / 2,
+                spread: Math.PI / 2,
+                fadeOut: true
+              });
+
+              this.cameras.main.shake(150, 0.015);
+            }
+          }
+        });
+      });
+    });
+  }
+
+  // === OVERLOAD (DANGEREUX - Phase 3) ===
+  // Toutes les tourelles tirent en même temps + explosion générale
+  bossArchitectOverload() {
+    if (!this.boss || !this.boss.active) return;
+    if (this.bossPhase < 3) return; // Phase 3 seulement
+
+    // Nettoyer les structures inactives
+    this.architectStructures = this.architectStructures.filter(s => s && s.active);
+
+    // Besoin d'au moins 2 structures
+    if (this.architectStructures.length < 2) return;
+
+    this.playSound('bossWarning');
+    this.playSound('bossCharge');
+
+    // === TELEGRAPH: Boss et toutes les structures brillent ===
+    const originalColor = this.bossColor;
+    this.boss.setFillStyle(0x00ff00);
+
+    // Toutes les structures clignotent
+    this.architectStructures.forEach(struct => {
+      if (struct && struct.active) {
+        this.tweens.add({
+          targets: struct,
+          alpha: { from: 1, to: 0.3 },
+          duration: 150,
+          yoyo: true,
+          repeat: 6
+        });
+      }
+    });
+
+    // Lignes de connexion entre boss et structures
+    const connectionLines = [];
+    this.architectStructures.forEach(struct => {
+      if (struct && struct.active) {
+        const line = this.add.line(
+          0, 0,
+          this.boss.x, this.boss.y,
+          struct.x, struct.y,
+          0x00ff00
+        ).setLineWidth(3).setAlpha(0.5).setDepth(50);
+        connectionLines.push(line);
+
+        this.tweens.add({
+          targets: line,
+          alpha: 1,
+          duration: 100,
+          yoyo: true,
+          repeat: 6
+        });
+      }
+    });
+
+    // Flash
+    this.cameras.main.flash(300, 0, 255, 100, false);
+
+    // Boss gonfle
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.5,
+      scaleY: 1.5,
+      duration: 1200,
+      ease: 'Quad.easeIn'
+    });
+
+    // === OVERLOAD! ===
+    this.time.delayedCall(1300, () => {
+      if (!this.boss || !this.boss.active) return;
+
+      // Supprimer les lignes
+      connectionLines.forEach(l => l.destroy());
+
+      // Chaque structure explose en tirs
+      this.architectStructures.forEach(struct => {
+        if (!struct || !struct.active) return;
+
+        // Tirs en cercle depuis chaque structure
+        const numBullets = 8;
+        for (let i = 0; i < numBullets; i++) {
+          const angle = (i / numBullets) * Math.PI * 2;
+          this.createBossBullet(struct.x, struct.y, angle, 180);
+        }
+
+        // Explosion visuelle
+        this.emitParticles(struct.x, struct.y, {
+          count: 20,
+          colors: [0x00ff44, 0x00ff00, 0xffffff],
+          minSpeed: 100,
+          maxSpeed: 200,
+          minSize: 4,
+          maxSize: 10,
+          life: 400,
+          spread: Math.PI * 2,
+          fadeOut: true
+        });
+      });
+
+      // Boss tire aussi
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2;
+        this.createBossBullet(this.boss.x, this.boss.y, angle, 150);
+      }
+
+      // Mega shake
+      this.cameras.main.shake(400, 0.03);
+
+      // Particules du boss
+      this.emitParticles(this.boss.x, this.boss.y, {
+        count: 40,
+        colors: [0x00ff44, 0x00ff00, 0xffffff, 0x00aa33],
+        minSpeed: 150,
+        maxSpeed: 300,
+        minSize: 5,
+        maxSize: 15,
+        life: 600,
+        spread: Math.PI * 2,
+        fadeOut: true
+      });
+
+      // === RECOVERY: Système en surchauffe ===
+      this.boss.setFillStyle(0x003311);
+      this.tweens.add({
+        targets: this.boss,
+        scaleX: 0.7,
+        scaleY: 0.7,
+        duration: 200
+      });
+
+      // Destruction de toutes les structures (overload les a grillées)
+      this.architectStructures.forEach(struct => {
+        if (struct && struct.active) {
+          if (struct.shootTimer) struct.shootTimer.remove();
+          this.time.delayedCall(500, () => {
+            if (struct.active) {
+              this.emitParticles(struct.x, struct.y, {
+                count: 15,
+                colors: [0x003311, 0x006622],
+                minSpeed: 50,
+                maxSpeed: 100,
+                minSize: 3,
+                maxSize: 7,
+                life: 300,
+                spread: Math.PI * 2,
+                fadeOut: true
+              });
+              struct.destroy();
+            }
+          });
+        }
+      });
+      this.architectStructures = [];
+
+      // Long recovery
+      this.time.delayedCall(3000, () => {
+        if (this.boss && this.boss.active) {
+          this.boss.setFillStyle(originalColor);
+          this.tweens.add({
+            targets: this.boss,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 400
+          });
+        }
+      });
+    });
+  }
+
   // ==========================================
   // BOSS 10 : TWINS - Combat synchronisé
   // ==========================================
@@ -9740,6 +11672,14 @@ class GameScene extends Phaser.Scene {
     this.twinsComboTimer = this.time.addEvent({
       delay: 5000,
       callback: this.bossTwinsComboAttack,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer Fusion (SUPER DANGEREUX - Phase 2+)
+    this.twinsFusionTimer = this.time.addEvent({
+      delay: 15000,
+      callback: this.bossTwinsFusion,
       callbackScope: this,
       loop: true
     });
@@ -9980,6 +11920,296 @@ class GameScene extends Phaser.Scene {
     } else {
       this.takeDamage(6); // Contact avec TWINS = 1.5 coeurs
     }
+  }
+
+  // === FUSION (SUPER DANGEREUX - Phase 2+) ===
+  // Les deux jumeaux fusionnent temporairement en un MEGA BOSS
+  bossTwinsFusion() {
+    if (!this.boss || !this.boss.active) return;
+    if (!this.twin2 || !this.twin2.alive) return; // Besoin des deux jumeaux
+    if (this.bossPhase < 2) return; // Phase 2+ seulement
+    if (this.twinsFusing) return; // Déjà en fusion
+
+    this.twinsFusing = true;
+    this.playSound('bossWarning');
+    this.playSound('bossCharge');
+
+    // === MEGA TELEGRAPH: Les jumeaux se rapprochent ===
+    const centerX = (this.boss.x + this.twin2.x) / 2;
+    const centerY = (this.boss.y + this.twin2.y) / 2;
+
+    // Les deux jumeaux vont vers le centre
+    this.tweens.add({
+      targets: this.boss,
+      x: centerX,
+      y: centerY,
+      duration: 1500,
+      ease: 'Quad.easeIn'
+    });
+
+    this.tweens.add({
+      targets: this.twin2,
+      x: centerX,
+      y: centerY,
+      duration: 1500,
+      ease: 'Quad.easeIn'
+    });
+
+    // Lien qui s'intensifie
+    const linkIntensify = this.time.addEvent({
+      delay: 100,
+      repeat: 14,
+      callback: () => {
+        if (!this.twinsLink) return;
+        this.twinsLink.clear();
+        this.twinsLink.lineStyle(6 + linkIntensify.repeatCount, 0xffff00, 0.8);
+        this.twinsLink.beginPath();
+        this.twinsLink.moveTo(this.boss.x, this.boss.y);
+        this.twinsLink.lineTo(this.twin2.x, this.twin2.y);
+        this.twinsLink.strokePath();
+      }
+    });
+
+    // Flash croissant
+    this.cameras.main.flash(500, 255, 200, 0, false);
+
+    // === FUSION! ===
+    this.time.delayedCall(1600, () => {
+      if (!this.boss || !this.boss.active || !this.twin2) return;
+
+      // Cacher temporairement twin2
+      this.twin2.setAlpha(0);
+      this.twinsLink.clear();
+
+      // MEGA BOSS - Boss devient énorme
+      const fusedBoss = {
+        originalScale: this.boss.scaleX,
+        originalColor: this.boss.fillColor
+      };
+
+      this.boss.setFillStyle(0xffffff); // Blanc éclatant
+      this.boss.setStrokeStyle(5, 0xffff00);
+
+      this.tweens.add({
+        targets: this.boss,
+        scaleX: 2.5,
+        scaleY: 2.5,
+        duration: 300,
+        ease: 'Back.easeOut'
+      });
+
+      // Explosion de particules de fusion
+      this.emitParticles(centerX, centerY, {
+        count: 60,
+        colors: [0xffff00, 0xff9900, 0xffffff, 0xff6600],
+        minSpeed: 200,
+        maxSpeed: 400,
+        minSize: 6,
+        maxSize: 18,
+        life: 700,
+        spread: Math.PI * 2,
+        fadeOut: true
+      });
+
+      // Mega shake
+      this.cameras.main.shake(500, 0.04);
+
+      // === FUSION ATTACKS - Série d'attaques dévastatrices ===
+      let attackCount = 0;
+      const maxAttacks = 4;
+
+      const fusionAttack = () => {
+        if (!this.boss || !this.boss.active) return;
+        if (attackCount >= maxAttacks) {
+          // Fin de la fusion
+          this.endTwinsFusion(fusedBoss, centerX, centerY);
+          return;
+        }
+
+        attackCount++;
+
+        // Différentes attaques en fonction du compteur
+        switch (attackCount) {
+          case 1:
+            // Cercle de projectiles massif
+            for (let i = 0; i < 20; i++) {
+              const angle = (i / 20) * Math.PI * 2;
+              this.createBossBullet(this.boss.x, this.boss.y, angle, 250);
+            }
+            this.cameras.main.shake(200, 0.02);
+            break;
+
+          case 2:
+            // Laser en croix
+            this.createFusionCrossLaser();
+            break;
+
+          case 3:
+            // Double cercle (décalé)
+            for (let i = 0; i < 16; i++) {
+              const angle = (i / 16) * Math.PI * 2;
+              this.createBossBullet(this.boss.x, this.boss.y, angle, 200);
+            }
+            this.time.delayedCall(200, () => {
+              if (this.boss && this.boss.active) {
+                for (let i = 0; i < 16; i++) {
+                  const angle = (i / 16) * Math.PI * 2 + Math.PI / 16;
+                  this.createBossBullet(this.boss.x, this.boss.y, angle, 180);
+                }
+              }
+            });
+            break;
+
+          case 4:
+            // Charge vers le joueur + explosion
+            if (this.player && this.player.active) {
+              const toPlayerX = this.player.x - this.boss.x;
+              const toPlayerY = this.player.y - this.boss.y;
+              const dist = Math.sqrt(toPlayerX * toPlayerX + toPlayerY * toPlayerY) || 1;
+
+              this.tweens.add({
+                targets: this.boss,
+                x: this.player.x,
+                y: this.player.y,
+                duration: 400,
+                ease: 'Quad.easeIn',
+                onComplete: () => {
+                  if (!this.boss || !this.boss.active) return;
+
+                  // Explosion à l'arrivée
+                  for (let i = 0; i < 24; i++) {
+                    const angle = (i / 24) * Math.PI * 2;
+                    this.createBossBullet(this.boss.x, this.boss.y, angle, 180);
+                  }
+
+                  this.emitParticles(this.boss.x, this.boss.y, {
+                    count: 40,
+                    colors: [0xffff00, 0xff9900, 0xffffff],
+                    minSpeed: 150,
+                    maxSpeed: 300,
+                    minSize: 5,
+                    maxSize: 12,
+                    life: 500,
+                    spread: Math.PI * 2,
+                    fadeOut: true
+                  });
+
+                  this.cameras.main.shake(400, 0.035);
+
+                  // Dégâts de zone
+                  if (this.player && this.player.active && !this.isInvincible) {
+                    const hitDist = Math.sqrt(
+                      Math.pow(this.player.x - this.boss.x, 2) +
+                      Math.pow(this.player.y - this.boss.y, 2)
+                    );
+                    if (hitDist < 80) {
+                      this.takeDamage(10); // FUSION HIT = 2.5 coeurs - SUPER DANGEREUX
+                    }
+                  }
+                }
+              });
+            }
+            break;
+        }
+
+        // Prochaine attaque
+        this.time.delayedCall(800, fusionAttack);
+      };
+
+      // Début des attaques après un court délai
+      this.time.delayedCall(500, fusionAttack);
+    });
+  }
+
+  createFusionCrossLaser() {
+    if (!this.boss || !this.boss.active) return;
+
+    // Laser horizontal
+    const laserH = this.add.rectangle(this.WORLD.width / 2, this.boss.y, this.WORLD.width, 25, 0xffff00, 0.8);
+    laserH.setDepth(50);
+
+    // Laser vertical
+    const laserV = this.add.rectangle(this.boss.x, this.WORLD.height / 2, 25, this.WORLD.height, 0xffff00, 0.8);
+    laserV.setDepth(50);
+
+    // Dégâts
+    const checkDamage = this.time.addEvent({
+      delay: 50,
+      repeat: 8,
+      callback: () => {
+        if (!this.player || !this.player.active || this.isInvincible) return;
+
+        const inHorizontal = Math.abs(this.player.y - this.boss.y) < 20;
+        const inVertical = Math.abs(this.player.x - this.boss.x) < 20;
+
+        if (inHorizontal || inVertical) {
+          this.takeDamage(8); // Laser de fusion = 2 coeurs
+        }
+      }
+    });
+
+    // Disparition
+    this.time.delayedCall(450, () => {
+      laserH.destroy();
+      laserV.destroy();
+    });
+  }
+
+  endTwinsFusion(fusedBoss, centerX, centerY) {
+    if (!this.boss || !this.boss.active) return;
+
+    // === DEFUSION: Retour à la normale avec LONG recovery ===
+
+    // Effet de séparation
+    this.emitParticles(this.boss.x, this.boss.y, {
+      count: 30,
+      colors: [0xffff00, 0xff9900],
+      minSpeed: 100,
+      maxSpeed: 200,
+      minSize: 4,
+      maxSize: 10,
+      life: 400,
+      spread: Math.PI * 2,
+      fadeOut: true
+    });
+
+    // Boss revient à taille normale
+    this.boss.setFillStyle(this.bossColor);
+    this.boss.setStrokeStyle(3, this.boss.strokeColor || 0xffffff);
+
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 300
+    });
+
+    // Twin2 réapparaît à côté
+    if (this.twin2) {
+      this.twin2.x = this.boss.x + 100;
+      this.twin2.y = this.boss.y;
+
+      this.tweens.add({
+        targets: this.twin2,
+        alpha: 1,
+        duration: 500
+      });
+    }
+
+    // Épuisement visuel
+    this.boss.setAlpha(0.5);
+    if (this.twin2) this.twin2.setAlpha(0.5);
+
+    // Long recovery - TRÈS vulnérable
+    this.time.delayedCall(3500, () => {
+      this.twinsFusing = false;
+      if (this.boss && this.boss.active) {
+        this.boss.setAlpha(1);
+      }
+      if (this.twin2 && this.twin2.alive) {
+        this.twin2.setAlpha(1);
+      }
+    });
   }
 
   // ==========================================
