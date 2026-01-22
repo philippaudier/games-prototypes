@@ -6192,11 +6192,25 @@ class GameScene extends Phaser.Scene {
 
     // Timer de tir (snort fréquent)
     this.chargerSnortTimer = this.time.addEvent({
-      delay: 1800,
+      delay: 900,
       callback: () => {
         if (!this.boss || !this.boss.active) return;
         if (this.chargerState === 'idle') {
           this.chargerSnort();
+        }
+      },
+      callbackScope: this,
+      loop: true
+    });
+
+    // Timer de harcèlement (tir rapide même pendant orbite)
+    this.chargerHarassTimer = this.time.addEvent({
+      delay: 600,
+      callback: () => {
+        if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+        // Tir de harcèlement même en mouvement (pas pendant les attaques majeures)
+        if (this.chargerState === 'idle' || this.chargerState === 'pacing') {
+          this.chargerQuickShot();
         }
       },
       callbackScope: this,
@@ -6691,6 +6705,51 @@ class GameScene extends Phaser.Scene {
           this.chargerState = 'idle';
         });
       }
+    });
+  }
+
+  // === TIR DE HARCÈLEMENT (pendant l'orbite) ===
+  chargerQuickShot() {
+    if (!this.boss || !this.boss.active || this.bossShotPaused) return;
+
+    // Tir simple vers le joueur sans s'arrêter
+    const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
+
+    // Petit effet visuel rapide
+    this.tweens.add({
+      targets: this.boss,
+      scaleX: 1.08,
+      scaleY: 0.95,
+      duration: 80,
+      yoyo: true
+    });
+
+    // Tir simple ou double en rage
+    const numShots = this.chargerRageMode ? 2 : 1;
+    const spreadAngle = 0.15;
+
+    for (let i = 0; i < numShots; i++) {
+      const shotAngle = numShots === 1 ? angle : angle - spreadAngle / 2 + spreadAngle * i;
+      this.createBossBullet(
+        this.boss.x + this.chargerFacing * 20,
+        this.boss.y,
+        shotAngle,
+        220
+      );
+    }
+
+    // Petites particules
+    this.emitParticles(this.boss.x + this.chargerFacing * 25, this.boss.y, {
+      count: 4,
+      colors: [0xaa00aa, 0xff00ff],
+      minSpeed: 40,
+      maxSpeed: 80,
+      minSize: 3,
+      maxSize: 6,
+      life: 200,
+      angle: angle,
+      spread: 0.4,
+      fadeOut: true
     });
   }
 
